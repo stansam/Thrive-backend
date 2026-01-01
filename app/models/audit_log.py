@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from app.extensions import db
 
@@ -21,5 +21,5 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.String(500))
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
 

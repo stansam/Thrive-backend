@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from decimal import Decimal
 from app.extensions import db
@@ -39,7 +39,7 @@ class Payment(db.Model):
     refunded_at = db.Column(db.DateTime)
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
     paid_at = db.Column(db.DateTime)
     
     def to_dict(self):

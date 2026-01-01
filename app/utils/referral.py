@@ -2,6 +2,10 @@ from flask import jsonify, current_app
 from functools import wraps
 from flask_login import current_user
 from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Optional
+import random
+import string
 
 class ReferralManager:
     """Handle referral system"""

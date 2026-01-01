@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from app.extensions import db
 
@@ -32,7 +32,7 @@ class Passenger(db.Model):
     meal_preference = db.Column(db.String(50))
     special_assistance = db.Column(db.String(200))
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}"

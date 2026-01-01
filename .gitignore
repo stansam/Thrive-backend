@@ -1,6 +1,9 @@
 __pycache__/
 venv/
 .env
+.env.prod
 instance/
 *1.py
 TODO
+.pytest_cache/
+*.pyc

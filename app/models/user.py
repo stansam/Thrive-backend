@@ -1,6 +1,6 @@
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 from app.extensions import db
 from app.models.enums import UserRole, SubscriptionTier
@@ -47,8 +47,8 @@ class User(UserMixin, db.Model):
     referral_credits = db.Column(db.Numeric(10, 2), default=0.00)
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime)
     
     # Relationships
@@ -70,7 +70,7 @@ class User(UserMixin, db.Model):
     def has_active_subscription(self):
         if not self.subscription_end:
             return False
-        return datetime.utcnow() < self.subscription_end
+        return datetime.now(timezone.utc)() < self.subscription_end
     
     def can_book(self):
         """Check if user can make more bookings based on subscription"""

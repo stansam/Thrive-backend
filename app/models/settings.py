@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from app.extensions import db
 
@@ -11,7 +11,7 @@ class Settings(db.Model):
     data_type = db.Column(db.String(20), default='string')  # string, int, float, bool, json
     description = db.Column(db.String(500))
     
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
     @staticmethod
     def get_value(key, default=None):

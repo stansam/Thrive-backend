@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from app.extensions import db
 from app.models.enums import PaymentStatus, TripType, TravelClass
@@ -31,18 +31,18 @@ class Quote(db.Model):
     
     converted_to_booking_id = db.Column(db.String(36), db.ForeignKey('bookings.id'))
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
     expires_at = db.Column(db.DateTime)
     quoted_at = db.Column(db.DateTime)
 
     # Foreign Key
     # user_id = db.Column(db.String(36), db.ForeignKey('users.id'))
     user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
-    
+
     def is_expired(self):
         if not self.expires_at:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
     
     def to_dict(self):
         return {

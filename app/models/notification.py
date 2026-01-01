@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from app.extensions import db
 
@@ -25,7 +25,7 @@ class Notification(db.Model):
     sent_via_email = db.Column(db.Boolean, default=False)
     sent_via_sms = db.Column(db.Boolean, default=False)
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
     
     def to_dict(self):
         return {

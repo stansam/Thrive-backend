@@ -1,6 +1,6 @@
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 from decimal import Decimal
 from app.extensions import db
@@ -57,8 +57,8 @@ class Booking(db.Model):
     assigned_agent_id = db.Column(db.String(36), db.ForeignKey('users.id'))
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     confirmed_at = db.Column(db.DateTime)
     cancelled_at = db.Column(db.DateTime)
     
