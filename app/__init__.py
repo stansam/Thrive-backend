@@ -21,9 +21,11 @@ def create_app(config_class=Config):
     # Register Blueprints
     from app.api import api_bp
     from app.api.auth import auth_bp
+    from app.api.client import client_bp
     
     app.register_blueprint(api_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(client_bp)
 
 
     return app
