@@ -1,7 +1,7 @@
 from flask import jsonify, current_app
 from functools import wraps
 from flask_login import current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 class SubscriptionManager:
@@ -25,8 +25,8 @@ class SubscriptionManager:
         from app.extensions import db
         
         user.subscription_tier = tier
-        user.subscription_start = datetime.utcnow()
-        user.subscription_end = datetime.utcnow() + timedelta(days=30 * duration_months)
+        user.subscription_start = datetime.now(timezone.utc)
+        user.subscription_end = datetime.now(timezone.utc) + timedelta(days=30 * duration_months)
         user.monthly_bookings_used = 0
         
         db.session.commit()

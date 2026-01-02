@@ -70,7 +70,10 @@ class User(UserMixin, db.Model):
     def has_active_subscription(self):
         if not self.subscription_end:
             return False
-        return datetime.now(timezone.utc)() < self.subscription_end
+        end = self.subscription_end
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < end
     
     def can_book(self):
         """Check if user can make more bookings based on subscription"""

@@ -38,3 +38,19 @@ class SubscriptionTier(str, Enum):
     BRONZE = "bronze"
     SILVER = "silver"
     GOLD = "gold"
+
+class BookingType(str, Enum):
+    FLIGHT = "flight"
+    PACKAGE = "package"
+    HOTEL = "hotel"
+    CUSTOM = "custom"
+
+class NotificationType(str, Enum):
+    BOOKING_CONFIRMED = "booking_confirmed"
+    BOOKING_CANCELLED = "booking_cancelled"
+    BOOKING_REMINDER = "booking_reminder"
+    PAYMENT_RECEIVED = "payment_received"
+    PAYMENT_FAILED = "payment_failed"
+    SUBSCRIPTION_RENEWED = "subscription_renewed"
+    SUBSCRIPTION_EXPIRED = "subscription_expired"
+    GENERAL = "general"

@@ -1,7 +1,7 @@
 from flask import jsonify, current_app
 from functools import wraps
 from flask_login import current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class Validator:
@@ -30,7 +30,7 @@ class Validator:
     @staticmethod
     def validate_date_of_birth(dob: datetime, min_age: int = 0, max_age: int = 150) -> Tuple[bool, str]:
         """Validate date of birth"""
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         
         if dob > today:
             return False, "Date of birth cannot be in the future"

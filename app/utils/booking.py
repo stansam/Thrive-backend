@@ -1,7 +1,7 @@
 from flask import jsonify, current_app
 from functools import wraps
 from flask_login import current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import random
 import string
@@ -40,7 +40,7 @@ class BookingManager:
     @staticmethod
     def validate_booking_dates(departure: datetime, return_date: datetime = None) -> Tuple[bool, str]:
         """Validate booking dates"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Check if departure is in the past
         if departure < now:
@@ -60,5 +60,5 @@ class BookingManager:
     @staticmethod
     def is_urgent_booking(departure: datetime, buffer_days: int = 7) -> bool:
         """Check if booking is urgent (within buffer days)"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return (departure - now).days < buffer_days

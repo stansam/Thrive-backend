@@ -27,5 +27,8 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(client_bp)
 
+    # Register CLI commands
+    from app.db_init.cli import register_commands
+    register_commands(app)
 
     return app

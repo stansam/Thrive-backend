@@ -1,7 +1,7 @@
 from flask import jsonify, current_app
 from functools import wraps
 from flask_login import current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 import requests
@@ -42,7 +42,7 @@ class PaymentProcessor:
         payment.status = 'refunded'
         payment.refund_amount = refund_amount
         payment.refund_reason = reason
-        payment.refunded_at = datetime.utcnow()
+        payment.refunded_at = datetime.now(timezone.utc)
         
         db.session.commit()
         return True
