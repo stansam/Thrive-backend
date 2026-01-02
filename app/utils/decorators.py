@@ -39,3 +39,35 @@ def subscription_required(*tiers):
             return f(*args, **kwargs)
         return decorated_function
     return decorator
+
+
+def admin_required():
+    """
+    Decorator to require admin role for JWT-protected routes
+    Uses flask_jwt_extended for token validation
+    """
+    from flask_jwt_extended import jwt_required, get_jwt_identity
+    from app.models import User
+    from app.models.enums import UserRole
+    
+    def decorator(f):
+        @wraps(f)
+        @jwt_required()
+        def decorated_function(*args, **kwargs):
+            # Get user ID from JWT token
+            user_id = get_jwt_identity()
+            
+            # Fetch user from database
+            user = User.query.get(user_id)
+            
+            # Check if user exists and is active
+            if not user or not user.is_active:
+                return APIResponse.unauthorized("Invalid user account")
+            
+            # Check if user has admin role
+            if user.role != UserRole.ADMIN:
+                return APIResponse.forbidden("Admin access required")
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator

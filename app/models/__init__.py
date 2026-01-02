@@ -7,4 +7,5 @@ from app.models.quote import Quote
 from app.models.notification import Notification
 from app.models.settings import Settings
 from app.models.audit_log import AuditLog
+from app.models.contact_message import ContactMessage
 # from app.models.enums import PaymentStatus, TripType, TravelClass 
