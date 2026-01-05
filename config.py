@@ -19,3 +19,5 @@ class Config:
     
     # Frontend URL for email links
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+    STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
