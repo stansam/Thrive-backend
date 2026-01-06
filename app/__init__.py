@@ -23,12 +23,16 @@ def create_app(config_class=Config):
     from app.api.auth import auth_bp
     from app.api.client import client_bp
     from app.api.admin import admin_bp
+    from app.api.flights import flights_bp
+    from app.api.payments import payment_bp
     
     app.register_blueprint(api_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(client_bp)
     app.register_blueprint(admin_bp)
-
+    app.register_blueprint(flights_bp)
+    app.register_blueprint(payment_bp)
+    
     # Register CLI commands
     from app.db_init.cli import register_commands
     register_commands(app)

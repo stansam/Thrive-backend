@@ -42,6 +42,18 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
     paid_at = db.Column(db.DateTime)
     
+    def __init__(self, **kwargs):
+        super(Payment, self).__init__(**kwargs)
+        if not self.payment_reference:
+            self.payment_reference = self.generate_payment_reference()
+            
+    @staticmethod
+    def generate_payment_reference():
+        import random
+        import string
+        chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        return f"PAY-{chars}"
+    
     def to_dict(self):
         return {
             'id': self.id,
