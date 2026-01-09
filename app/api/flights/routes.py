@@ -475,9 +475,48 @@ def create_booking():
         total_price = Decimal(price.get('total', '0'))
         taxes = total_price - base_price
         
-        # Calculate service fee (e.g., 5% of base price)
-        service_fee = base_price * Decimal('0.05')
-        final_total = total_price + service_fee
+        # --- SERVICE FEE LOGIC ---
+        # 1. Determine if International
+        # Simple heuristic: if origin or dest country code is not US/Home country (assuming US for now)
+        # In a real app, calls to Location API or a local DB of airports is needed.
+        # Here we will imply it from the `type` or if simple check on airport IATA fails.
+        # For this implementation, we default to DOMESTIC unless identified otherwise.
+        # User requested $25-50 Domestic, $50-100 International.
+        
+        # Let's assume a default Fee
+        service_fee = Decimal('25.00') # Base Domestic
+        country_origin = first_segment.get('departure', {}).get('iataCode')
+        country_dest = last_segment.get('arrival', {}).get('iataCode')
+        
+        # Basic known US airports for demo purposes (expand list or use API later)
+        us_airports = ['JFK', 'LAX', 'SFO', 'ORD', 'MIA', 'ATL', 'DFW', 'DEN', 'SEA', 'LAS', 'MCO', 'EWR', 'CLT', 'PHX', 'IAH', 'BOS', 'MSP', 'DTW', 'FLL', 'PHL', 'LGA', 'BWI', 'SLC', 'SAN', 'IAD', 'DCA', 'TPA', 'MDW', 'HNL', 'SAN']
+        is_international = False
+        
+        if country_origin not in us_airports or country_dest not in us_airports:
+             service_fee = Decimal('50.00') 
+             is_international = True
+
+        # Last minute? (Departure < 24h)
+        dep_time = datetime.fromisoformat(first_segment.get('departure', {}).get('at', '').replace('Z', '+00:00'))
+        if (dep_time - datetime.now(timezone.utc)).total_seconds() < 86400:
+             service_fee += Decimal('25.00')
+             
+        # Group booking? (> 4 pax)
+        num_travelers = len(data['travelers'])
+        if num_travelers >= 5:
+             # Override per ticket fee with Group rate
+             service_fee = Decimal('15.00') * num_travelers
+        
+        # Check Subscription Waiver
+        if user.subscription_tier == 'gold':
+             service_fee = Decimal('0.00')
+        elif user.subscription_tier == 'silver' and user.monthly_bookings_used < 15:
+             service_fee = Decimal('0.00')
+        elif user.subscription_tier == 'bronze' and user.monthly_bookings_used < 6:
+             service_fee = Decimal('0.00')
+
+        # Total amount to charge NOW (Service Fee Only)
+        pay_amount = service_fee
         
         # Create booking
         booking = Booking(
@@ -495,20 +534,21 @@ def create_booking():
             ) if last_segment.get('arrival', {}).get('at') and len(itineraries) > 1 else None,
             airline=first_segment.get('carrierCode'),
             flight_number=first_segment.get('number'),
-            travel_class=TravelClass.ECONOMY,  # Extract from validatingAirlineCodes or travelerPricings
+            travel_class=TravelClass.ECONOMY,
+            flight_offer=first_offer, # Store JSON
             num_adults=len([t for t in data['travelers'] if t.get('travelerType', 'ADULT') == 'ADULT']),
             num_children=len([t for t in data['travelers'] if t.get('travelerType') == 'CHILD']),
             num_infants=len([t for t in data['travelers'] if t.get('travelerType') == 'INFANT']),
             base_price=base_price,
             service_fee=service_fee,
             taxes=taxes,
-            total_price=final_total,
+            total_price=total_price, # Total Ticket Price (Reference Only)
             special_requests=data.get('specialRequests'),
-            assigned_agent_id=None  # Can be assigned later
+            assigned_agent_id=None
         )
         
         db.session.add(booking)
-        db.session.flush()  # Get booking ID
+        db.session.flush()
         
         # Add passengers
         for idx, traveler_data in enumerate(data['travelers']):
@@ -531,18 +571,17 @@ def create_booking():
             )
             db.session.add(passenger)
         
-        # Create payment record
+        # Create payment record (FOR SERVICE FEE ONLY)
         payment = Payment(
             booking_id=booking.id,
             user_id=user.id,
-            amount=final_total,
+            amount=pay_amount, # Paying Service Fee
             currency=price.get('currency', 'USD'),
             payment_method=data.get('paymentMethod', 'card'),
-            status=PaymentStatus.PENDING
+            status=PaymentStatus.PENDING if pay_amount > 0 else PaymentStatus.PAID
         )
         db.session.add(payment)
         
-        # Commit to database
         db.session.commit()
         
         # Log audit
@@ -557,12 +596,13 @@ def create_booking():
         # Return booking details for payment
         return jsonify({
             'success': True,
-            'message': 'Booking created successfully',
+            'message': 'Booking initialized',
             'data': {
                 'bookingId': booking.id,
                 'bookingReference': booking.booking_reference,
                 'paymentId': payment.id,
-                'amount': float(final_total),
+                'amountDue': float(pay_amount), # Frontend should check this
+                'totalTicketPrice': float(total_price),
                 'currency': price.get('currency', 'USD'),
                 'status': booking.status.value
             }
@@ -633,23 +673,87 @@ def confirm_booking():
         }), 404
     
     try:
-        # Process payment (integrate with actual payment service)
-        payment_service = PaymentService(current_app.config)
-        payment_result = payment_service.confirm_payment(
-            payment_intent_id=data.get('paymentIntentId'),
-            amount=float(payment.amount),
-            currency=payment.currency
-        )
-        
-        if payment_result.get('status') == 'succeeded':
+        # 1. Process Service Fee Payment (if applicable)
+        if payment.status != PaymentStatus.PAID:
+            payment_service = PaymentService(current_app.config)
+            payment_result = payment_service.confirm_payment(
+                payment_intent_id=data.get('paymentIntentId'),
+                amount=float(payment.amount),
+                currency=payment.currency
+            )
+            
+            if payment_result.get('status') != 'succeeded':
+                payment.status = PaymentStatus.FAILED
+                payment.failure_reason = payment_result.get('error', 'Payment failed')
+                db.session.commit()
+                return jsonify({
+                    'success': False,
+                    'error': 'PAYMENT_FAILED',
+                    'message': 'Service fee payment failed. Please try again.'
+                }), 400
+                
             payment.status = PaymentStatus.PAID
             payment.paid_at = datetime.now(timezone.utc)
             payment.stripe_payment_intent_id = data.get('paymentIntentId')
             payment.transaction_id = payment_result.get('transactionId')
+        
+        # 2. Call Amadeus to Create Order (Hold Booking)
+        # We need to construct the travelers payload from our DB or the original request.
+        # Ideally, we should have stored the full traveler payload or reconstruct it.
+        # For this example, we'll reconstruct from DB passengers, which contains necessary fields.
+        
+        amadeus = create_amadeus_service(
+            client_id=current_app.config.get('AMADEUS_CLIENT_ID'),
+            client_secret=current_app.config.get('AMADEUS_CLIENT_SECRET'),
+            environment=current_app.config.get('AMADEUS_ENV', 'test')
+        )
+        
+        # Reconstruct travelers list for Amadeus
+        # Note: In production, ensure all required Amadeus fields are mapped correctly.
+        amadeus_travelers = []
+        for i, p in enumerate(booking.passengers):
+            t_obj = {
+                "id": str(i + 1),
+                "dateOfBirth": p.date_of_birth.isoformat(),
+                "name": {
+                    "firstName": p.first_name.upper(),
+                    "lastName": p.last_name.upper()
+                },
+                "gender": p.gender.upper(),
+                "contact": {
+                    "emailAddress": user.email,
+                    "phones": [{"deviceType": "MOBILE", "countryCallingCode": "1", "number": user.phone or "0000000000"}]
+                }
+            }
+            if p.passport_number:
+                t_obj["documents"] = [{
+                    "documentType": "PASSPORT",
+                    "birthPlace": "Unknown", # Optional
+                    "issuanceLocation": "Unknown", # Optional
+                    "issuanceDate": "2020-01-01", # Placeholder if not collected
+                    "number": p.passport_number,
+                    "expiryDate": p.passport_expiry.isoformat(),
+                    "issuanceCountry": p.passport_country or "US",
+                    "validityCountry": p.passport_country or "US",
+                    "nationality": p.nationality or "US",
+                    "holder": True
+                }]
+            amadeus_travelers.append(t_obj)
             
-            # Update booking status
-            booking.status = BookingStatus.CONFIRMED
+        try:
+            order_result = amadeus.create_flight_order(
+                flight_offers=[booking.flight_offer], # Use stored offer
+                travelers=amadeus_travelers
+            )
+            
+            # Update booking with PNR
+            amadeus_order = order_result.get('data', {})
+            pnr = amadeus_order.get('id') or amadeus_order.get('associatedRecords', [{}])[0].get('reference')
+            
+            booking.booking_reference = pnr # Use real PNR
+            booking.status = BookingStatus.HELD # Set to HELD
             booking.confirmed_at = datetime.now(timezone.utc)
+            booking.airline_confirmation = pnr
             
             # Update user's monthly booking count
             user.monthly_bookings_used += 1
@@ -666,31 +770,34 @@ def confirm_booking():
             # Log audit
             log_audit(
                 user_id=user.id,
-                action='BOOKING_CONFIRMED',
+                action='BOOKING_HELD',
                 entity_type='booking',
                 entity_id=booking.id,
-                description=f"Confirmed booking {booking.booking_reference}"
+                description=f"Booking held with PNR {pnr}"
             )
             
             return jsonify({
                 'success': True,
-                'message': 'Booking confirmed successfully',
+                'message': 'Booking successfully held',
                 'data': {
-                    'bookingReference': booking.booking_reference,
+                    'bookingReference': pnr,
                     'status': booking.status.value,
-                    'confirmationNumber': booking.airline_confirmation
+                    'isHeld': True,
+                    'nextSteps': 'Please contact admin to finalize ticket payment.'
                 }
             }), 200
-        else:
-            payment.status = PaymentStatus.FAILED
-            payment.failure_reason = payment_result.get('error', 'Payment failed')
-            db.session.commit()
             
+        except Exception as e:
+            logger.error(f"Amadeus Flight Order Failed: {str(e)}")
+            # Even if Amadeus fails, we have collected service fee.
+            # We should probably keep status as PENDING or manual review needed.
+            # ideally refund or alert admin.
             return jsonify({
                 'success': False,
-                'error': 'PAYMENT_FAILED',
-                'message': 'Payment processing failed. Please try again.'
-            }), 400
+                'error': 'BOOKING_CREATION_FAILED',
+                'message': 'Service fee paid, but airline booking failed. Please contact support.',
+                'details': str(e)
+            }), 500
             
     except Exception as e:
         db.session.rollback()

@@ -5,6 +5,7 @@ from app.extensions import db
 class BookingStatus(str, Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
+    HELD = "held"
     CANCELLED = "cancelled"
     COMPLETED = "completed"
     REFUNDED = "refunded"

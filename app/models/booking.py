@@ -29,6 +29,7 @@ class Booking(db.Model):
     # Flight specific
     airline = db.Column(db.String(100))
     flight_number = db.Column(db.String(20))
+    flight_offer = db.Column(db.JSON)  # Raw Amadeus offer object
     travel_class = db.Column(db.Enum(TravelClass))
     num_adults = db.Column(db.Integer, default=1)
     num_children = db.Column(db.Integer, default=0)

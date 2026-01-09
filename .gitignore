@@ -9,3 +9,4 @@ TODO
 *.pyc
 migrations/
 instance/
+prompt.txt
