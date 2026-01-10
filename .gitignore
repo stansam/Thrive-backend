@@ -10,3 +10,4 @@ TODO
 migrations/
 instance/
 prompt.txt
+*.db

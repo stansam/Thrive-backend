@@ -8,7 +8,8 @@ from flask import current_app
 from flask.cli import with_appcontext
 from app.db_init import init_database, clear_database
 from app.db_init.init_db import reset_database
-
+from app.db_init.sample_packages import SAMPLE_PACKAGES
+from app.models.package import Package
 
 @click.group()
 def db_commands():
@@ -59,3 +60,17 @@ def clear_db_command():
 def register_commands(app):
     """Register CLI commands with the Flask app"""
     app.cli.add_command(db_commands, name='db-manage')
+
+@db_commands.command('load-packages')
+@click.option('--clear', is_flag=True, help='Clear existing packages before loading')
+@with_appcontext
+def load_packages_command(clear):
+    '''Load sample packages into the database.'''
+    success, errors, error_list = Package.load_packages(SAMPLE_PACKAGES, clear_existing=clear)
+    
+    if errors == 0:
+        click.echo(f'✅ Successfully loaded {success} packages!')
+    else:
+        click.echo(f'⚠️ Loaded {success} packages with {errors} errors.')
+        for error in error_list:
+            click.echo(f'  ❌ {error}')

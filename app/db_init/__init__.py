@@ -11,5 +11,6 @@ __all__ = [
     'clear_database',
     'create_sample_users',
     'create_sample_bookings',
-    'create_sample_packages',
+    # 'create_sample_packages',
+    'load_packages_command',
 ]

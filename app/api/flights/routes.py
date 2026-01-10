@@ -2,7 +2,7 @@
 Flight Booking API Routes
 Provides endpoints for flight search, pricing, booking, and management
 """
-
+from dateutil import parser
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timezone
@@ -498,8 +498,8 @@ def create_booking():
 
         # Last minute? (Departure < 24h)
         dep_time = datetime.fromisoformat(first_segment.get('departure', {}).get('at', '').replace('Z', '+00:00'))
-        if (dep_time - datetime.now(timezone.utc)).total_seconds() < 86400:
-             service_fee += Decimal('25.00')
+        # if (dep_time - datetime.now(timezone.utc)).total_seconds() < 86400:
+        #      service_fee += Decimal('25.00')
              
         # Group booking? (> 4 pax)
         num_travelers = len(data['travelers'])
