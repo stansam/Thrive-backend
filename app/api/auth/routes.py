@@ -437,8 +437,9 @@ def refresh():
         current_user_id = get_jwt_identity()
         
         # Check if token is blacklisted
-        jti = get_jwt()['jti']
-        if jti in token_blacklist:
+        jwt_payload = get_jwt()
+        jti = jwt_payload['jti']
+        if RevokedToken.is_revoked(jti):
             return APIResponse.unauthorized('Token has been revoked')
         
         # Get user
@@ -446,15 +447,21 @@ def refresh():
         if not user or not user.is_active:
             return APIResponse.unauthorized('User not found or inactive')
         
+        new_refresh_token = create_refresh_token(identity=user.id)
+        revoked = RevokedToken(jti=jti, type='refresh')
+        db.session.add(revoked)
+        db.session.commit()
+
         # Generate new access token
-        access_token = create_access_token(
+        new_access_token = create_access_token(
             identity=user.id,
             additional_claims={'email': user.email, 'role': user.role.value}
         )
         
         return APIResponse.success(
             data={
-                'accessToken': access_token,
+                'accessToken': new_access_token,
+                'refreshToken': new_refresh_token,
                 'tokenType': 'Bearer'
             },
             message='Token refreshed successfully'

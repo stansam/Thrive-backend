@@ -1,5 +1,5 @@
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from flask import request, current_app
-from flask_login import current_user, login_required
 from sqlalchemy import or_, and_, func, desc, asc
 from datetime import datetime, date
 from decimal import Decimal
@@ -352,9 +352,16 @@ def get_package_detail(package_id):
         # Increment view count
         package.view_count += 1
         db.session.commit()
+
+        current_user = None
+        try:
+            verify_jwt_in_request(optional=True)
+            current_user_id = get_jwt_identity() 
+            current_user = User.query.get(current_user_id)
+        except Exception:
+            current_user = None
         
-        # Log view action if user is authenticated
-        if current_user.is_authenticated:
+        if current_user:
             try:
                 AuditLogger.log_action(
                     user_id=current_user.id,
@@ -408,8 +415,16 @@ def get_package_by_slug(slug):
         package.view_count += 1
         db.session.commit()
         
+        current_user = None
+        try:
+            verify_jwt_in_request(optional=True)
+            current_user_id = get_jwt_identity() 
+            current_user = User.query.get(current_user_id)
+        except Exception:
+            current_user = None
+        
         # Log view action if user is authenticated
-        if current_user.is_authenticated:
+        if current_user:
             try:
                 AuditLogger.log_action(
                     user_id=current_user.id,
@@ -634,7 +649,7 @@ def get_package_statistics():
 # ============================================================================
 
 @packages_bp.route('/favorites', methods=['GET'])
-@login_required
+@jwt_required()
 def get_user_favorites():
     """
     Get user's favorite packages (requires favorites relationship in User model)
@@ -645,8 +660,11 @@ def get_user_favorites():
     try:
         # This assumes a many-to-many relationship between User and Package
         # You'll need to implement this in your models
-        if hasattr(current_user, 'favorite_packages'):
-            favorites = current_user.favorite_packages.filter_by(is_active=True).all()
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if hasattr(user, 'favorite_packages'):
+            favorites = user.favorite_packages.filter_by(is_active=True).all()
             return APIResponse.success(
                 data=[pkg.to_dict() for pkg in favorites],
                 message=f"Found {len(favorites)} favorite package(s)"

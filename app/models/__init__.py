@@ -8,4 +8,5 @@ from app.models.notification import Notification
 from app.models.settings import Settings
 from app.models.audit_log import AuditLog
 from app.models.contact_message import ContactMessage
+from app.models.revoked_tokens import RevokedToken
 # from app.models.enums import PaymentStatus, TripType, TravelClass 
