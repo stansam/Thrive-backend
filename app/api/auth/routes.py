@@ -19,6 +19,7 @@ from google.auth.transport import requests as google_requests
 
 from app.extensions import db
 from app.models import User
+from app.models.revoked_tokens import RevokedToken
 from app.models.enums import UserRole, SubscriptionTier
 from app.api.auth.schemas import AuthSchemas
 from app.utils.api_response import APIResponse
@@ -460,9 +461,11 @@ def refresh():
         
         return APIResponse.success(
             data={
-                'accessToken': new_access_token,
-                'refreshToken': new_refresh_token,
-                'tokenType': 'Bearer'
+                'tokens': {
+                    'accessToken': new_access_token,
+                    'refreshToken': new_refresh_token,
+                    'tokenType': 'Bearer'
+                }
             },
             message='Token refreshed successfully'
         )

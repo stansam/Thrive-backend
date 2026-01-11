@@ -40,7 +40,7 @@ def init_database(with_sample_data=True):
         print("\n📦 Creating sample data...")
         from .sample_data import (
             create_sample_users,
-            create_sample_packages,
+            # create_sample_packages,
             create_sample_bookings,
             create_sample_payments,
             create_sample_notifications,
@@ -49,7 +49,7 @@ def init_database(with_sample_data=True):
         
         # Create data in order (respecting foreign keys)
         users = create_sample_users()
-        packages = create_sample_packages()
+        packages = Package.query.order_by(Package.id.asc()).all()
         bookings = create_sample_bookings(users, packages)
         payments = create_sample_payments(users, bookings)
         notifications = create_sample_notifications(users, bookings)

@@ -10,4 +10,4 @@ TODO
 migrations/
 instance/
 prompt.txt
-*.db
+thrive.db
