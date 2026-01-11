@@ -449,9 +449,15 @@ def refresh():
             return APIResponse.unauthorized('User not found or inactive')
         
         new_refresh_token = create_refresh_token(identity=user.id)
-        revoked = RevokedToken(jti=jti, type='refresh')
-        db.session.add(revoked)
-        db.session.commit()
+        
+        try:
+            revoked = RevokedToken(jti=jti, type='refresh')
+            db.session.add(revoked)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            # If we can't revoke it (already revoked), then this request is using a stale/used token.
+            return APIResponse.unauthorized('Token has already been used')
 
         # Generate new access token
         new_access_token = create_access_token(
