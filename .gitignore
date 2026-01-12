@@ -11,3 +11,4 @@ migrations/
 instance/
 prompt.txt
 thrive.db
+instance/thrive.db
