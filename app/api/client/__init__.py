@@ -1,6 +1,6 @@
-"""
-Client Dashboard API Blueprint
-"""
-from app.api.client.routes import client_bp
 
-__all__ = ['client_bp']
+from flask import Blueprint
+
+client_bp = Blueprint('client', __name__, url_prefix='/api/client/dashboard')
+
+from . import dashboard, profile, subscriptions, bookings, flights, packages
