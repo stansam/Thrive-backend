@@ -39,6 +39,9 @@ class User(UserMixin, db.Model):
     company_tax_id = db.Column(db.String(50))
     billing_address = db.Column(db.Text)
     
+    # Custom Settings (Notifications, Privacy, etc.)
+    custom_settings = db.Column(db.JSON, default={})
+    
     # Account status
     email_verified = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)

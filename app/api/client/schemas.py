@@ -374,3 +374,30 @@ class DashboardSchemas:
         cleaned = re.sub(r'[\s\-\(\)\+]', '', phone)
         # Check if it's 10-15 digits
         return cleaned.isdigit() and 10 <= len(cleaned) <= 15
+    
+    @staticmethod
+    def validate_settings_update(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, str]], Optional[Dict[str, Any]]]:
+        """
+        Validate settings update data
+        """
+        errors = {}
+        cleaned_data = {}
+        
+        # Boolean fields
+        bool_fields = [
+            'emailNotifications', 
+            'marketingEmails', 
+            'smsNotifications', 
+            'profileVisibility', 
+            'dataSharing'
+        ]
+        
+        for field in bool_fields:
+            if field in data:
+                if not isinstance(data[field], bool):
+                   errors[field] = f'{field} must be a boolean'
+                else:
+                   cleaned_data[field] = data[field]
+                   
+        is_valid = len(errors) == 0
+        return is_valid, errors if not is_valid else None, cleaned_data if is_valid else None
