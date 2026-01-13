@@ -103,3 +103,72 @@ def get_payments():
     except Exception as e:
         current_app.logger.error(f"Get payments error: {str(e)}")
         return APIResponse.error('An error occurred while fetching payment history')
+
+@client_bp.route('/payments/<payment_id>/invoice', methods=['GET'])
+@jwt_required()
+def download_invoice(payment_id):
+    """
+    Generate and download invoice for a payment
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        payment = Payment.query.filter_by(id=payment_id, user_id=current_user_id).first()
+        
+        if not payment:
+            return APIResponse.not_found('Payment not found')
+            
+        # Generate PDF
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from io import BytesIO
+        from flask import send_file
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Header
+        elements.append(Paragraph(f"INVOICE", styles['Title']))
+        elements.append(Spacer(1, 12))
+        
+        # content
+        # ... simplified invoice generation logic ...
+        data = [
+            ["Payment Reference", payment.payment_reference],
+            ["Date", payment.created_at.strftime('%Y-%m-%d %H:%M')],
+            ["Amount", f"{payment.currency} {payment.amount}"],
+            ["Status", payment.status.value],
+            ["Description", payment.payment_metadata.get('description', 'Payment')]
+        ]
+        
+        if payment.payment_method:
+             data.append(["Payment Method", payment.payment_method])
+
+        t = Table(data)
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.grey),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(t)
+        
+        doc.build(elements)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"invoice_{payment.payment_reference}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Generate invoice error: {str(e)}")
+        return APIResponse.error('Failed to generate invoice')
