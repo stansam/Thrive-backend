@@ -176,16 +176,25 @@ def get_users():
         
         # Role filter
         if 'role' in args and args['role']:
-            query = query.filter_by(role=UserRole(args['role']))
+            try:
+                role = UserRole[args['role'].upper()]
+                query = query.filter(User.role == role)
+            except KeyError:
+                return APIResponse.error("Invalid role filter")
         
         # Subscription filter
         if 'subscriptionTier' in args and args['subscriptionTier']:
-            query = query.filter_by(subscription_tier=SubscriptionTier(args['subscriptionTier']))
-        
+            try:
+                tier = SubscriptionTier[args['subscriptionTier'].upper()]
+                query = query.filter(User.subscription_tier == tier)
+            except KeyError:
+                return APIResponse.error("Invalid subscription tier")
+
         # Active status filter
-        if 'isActive' in args:
-            is_active = args['isActive'].lower() == 'true'
-            query = query.filter_by(is_active=is_active)
+        if args.get('isActive') in ['true', 'false']:
+            query = query.filter(
+                User.is_active == (args['isActive'] == 'true')
+            )
         
         # Sorting
         sort_by = args.get('sortBy', 'created_at')
