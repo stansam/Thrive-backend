@@ -9,7 +9,7 @@ from app.api.client.schemas import DashboardSchemas
 from app.utils.api_response import APIResponse
 from app.utils.audit_logging import AuditLogger
 
-from . import client_bp
+from app.api.client import client_bp
 
 @client_bp.route('/profile', methods=['GET'])
 @jwt_required()

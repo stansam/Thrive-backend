@@ -8,7 +8,7 @@ from app.models import User, Booking
 from app.models.enums import BookingStatus, BookingType
 from app.utils.api_response import APIResponse
 
-from . import client_bp
+from app.api.client import client_bp
 
 @client_bp.route('/flights', methods=['GET'])
 @jwt_required()

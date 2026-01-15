@@ -14,7 +14,7 @@ from app.utils.email import EmailService
 from app.utils.audit_logging import AuditLogger
 from app.services.notification import NotificationService
 
-from . import client_bp
+from app.api.client import client_bp
 
 @client_bp.route('/bookings', methods=['GET'])
 @jwt_required()

@@ -60,6 +60,21 @@ class User(UserMixin, db.Model):
     payments = db.relationship('Payment', backref='user', lazy='dynamic')
     notifications = db.relationship('Notification', backref='user', lazy='dynamic')
     referrals = db.relationship('User', backref=db.backref('referrer', remote_side=[id]))
+
+    # Favorites
+    favorite_packages = db.relationship(
+        'Package', 
+        secondary='user_favorites', 
+        backref=db.backref('favorited_by', lazy='dynamic'), 
+        lazy='dynamic'
+    )
+
+    # Association table for favorites
+    user_favorites = db.Table('user_favorites',
+        db.Column('user_id', db.String(36), db.ForeignKey('users.id'), primary_key=True),
+        db.Column('package_id', db.String(36), db.ForeignKey('packages.id'), primary_key=True),
+        db.Column('created_at', db.DateTime, default=datetime.now(timezone.utc))
+    )
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

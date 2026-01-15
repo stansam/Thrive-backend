@@ -18,7 +18,7 @@ from app.services.notification import NotificationService
 from app.api.flights import flights_bp as bp
 from app.utils.api_response import APIResponse
 from app.extensions import db
-from .utils import handle_api_error, log_audit
+from app.api.flights.utils import handle_api_error, log_audit
 
 logger = logging.getLogger(__name__)
 

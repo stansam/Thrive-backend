@@ -6,7 +6,7 @@ import logging
 from app.models.user import User
 from app.services.amadeus import create_amadeus_service
 from app.api.flights import flights_bp as bp
-from .utils import handle_api_error, log_audit, map_travel_class
+from app.api.flights.utils import handle_api_error, log_audit, map_travel_class
 
 logger = logging.getLogger(__name__)
 

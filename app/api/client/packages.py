@@ -7,7 +7,7 @@ from app.models import User, Package, Booking
 from app.models.enums import BookingType
 from app.utils.api_response import APIResponse
 
-from . import client_bp
+from app.api.client import client_bp
 
 @client_bp.route('/packages/explore', methods=['GET'])
 @jwt_required()
@@ -31,9 +31,9 @@ def explore_packages():
             )
             
         packages = query.limit(20).all()
-        
+        featured_packages = Package.query.filter_by(is_featured=True).all()
         # Find a featured package (e.g. curated one or just random/latest)
-        featured = [packages[0].to_dict()] if packages else []
+        featured = [p.to_dict() for p in featured_packages] if featured_packages else []
 
         return APIResponse.success(
             data={
@@ -72,9 +72,10 @@ def my_packages():
                 b_data['destination'] = f"{b.package.destination_city}, {b.package.destination_country}"
             booked_list.append(b_data)
             
-        # Saved packages - Placeholder for now as "Saved" model might not exist yet
-        # If Wishlist model exists, query it here.
         saved_list = []
+        user = User.query.get(current_user_id)
+        if user:
+            saved_list = [pkg.to_dict() for pkg in user.favorite_packages.filter_by(is_active=True).all()]
 
         return APIResponse.success(
             data={

@@ -7,7 +7,7 @@ from app.models import User, Payment, Booking
 from app.models.enums import PaymentStatus
 from app.utils.api_response import APIResponse
 
-from . import client_bp
+from app.api.client import client_bp
 
 @client_bp.route('/payments', methods=['GET'])
 @jwt_required()

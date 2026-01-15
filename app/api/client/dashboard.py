@@ -10,7 +10,7 @@ from app.models import User, Booking, Payment, Notification
 from app.models.enums import BookingStatus, PaymentStatus
 from app.utils.api_response import APIResponse
 
-from . import client_bp
+from app.api.client import client_bp
 
 @client_bp.route('/summary', methods=['GET'])
 @jwt_required()

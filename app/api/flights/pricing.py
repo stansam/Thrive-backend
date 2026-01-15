@@ -1,7 +1,7 @@
 from flask import request, jsonify, current_app
 from app.services.amadeus import create_amadeus_service
 from app.api.flights import flights_bp as bp
-from .utils import handle_api_error
+from app.api.flights.utils import handle_api_error
 
 # ==================== PRICING ENDPOINTS ====================
 
