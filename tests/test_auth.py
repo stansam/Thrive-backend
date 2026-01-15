@@ -272,7 +272,8 @@ class TestTokenRefresh:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['success'] is True
-        assert 'accessToken' in data['data']
+        assert 'tokens' in data['data']
+        assert 'accessToken' in data['data']['tokens']
     
     def test_token_refresh_without_token(self, client):
         """Test token refresh without providing token"""

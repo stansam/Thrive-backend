@@ -39,45 +39,43 @@ def client(app):
 @pytest.fixture
 def admin_user(app):
     """Create admin user for testing"""
-    with app.app_context():
-        admin = User(
-            email='admin@test.com',
-            first_name='Admin',
-            last_name='User',
-            role=UserRole.ADMIN,
-            subscription_tier=SubscriptionTier.NONE,
-            email_verified=True,
-            is_active=True
-        )
-        admin.set_password('AdminPass123')
-        admin.referral_code = 'ADMIN123'
-        
-        db.session.add(admin)
-        db.session.commit()
-        
-        return admin
+    admin = User(
+        email='admin@test.com',
+        first_name='Admin',
+        last_name='User',
+        role=UserRole.ADMIN,
+        subscription_tier=SubscriptionTier.NONE,
+        email_verified=True,
+        is_active=True
+    )
+    admin.set_password('AdminPass123')
+    admin.referral_code = 'ADMIN123'
+    
+    db.session.add(admin)
+    db.session.commit()
+    
+    return admin
 
 
 @pytest.fixture
 def regular_user(app):
     """Create regular user for testing"""
-    with app.app_context():
-        user = User(
-            email='user@test.com',
-            first_name='Regular',
-            last_name='User',
-            role=UserRole.CUSTOMER,
-            subscription_tier=SubscriptionTier.BRONZE,
-            email_verified=True,
-            is_active=True
-        )
-        user.set_password('UserPass123')
-        user.referral_code = 'USER123'
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        return user
+    user = User(
+        email='user@test.com',
+        first_name='Regular',
+        last_name='User',
+        role=UserRole.CUSTOMER,
+        subscription_tier=SubscriptionTier.BRONZE,
+        email_verified=True,
+        is_active=True
+    )
+    user.set_password('UserPass123')
+    user.referral_code = 'USER123'
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    return user
 
 
 @pytest.fixture
@@ -192,8 +190,7 @@ class TestUserManagement:
     
     def test_get_user_details(self, client, admin_token, regular_user, app):
         """Test getting detailed user information"""
-        with app.app_context():
-            user_id = User.query.filter_by(email='user@test.com').first().id
+        user_id = User.query.filter_by(email='user@test.com').first().id
         
         response = client.get(f'/api/admin/users/{user_id}',
             headers={'Authorization': f'Bearer {admin_token}'}
@@ -208,8 +205,7 @@ class TestUserManagement:
     
     def test_update_user(self, client, admin_token, regular_user, app):
         """Test updating user details"""
-        with app.app_context():
-            user_id = User.query.filter_by(email='user@test.com').first().id
+        user_id = User.query.filter_by(email='user@test.com').first().id
         
         response = client.patch(f'/api/admin/users/{user_id}',
             headers={'Authorization': f'Bearer {admin_token}'},
@@ -226,8 +222,7 @@ class TestUserManagement:
     
     def test_deactivate_user(self, client, admin_token, regular_user, app):
         """Test deactivating user account"""
-        with app.app_context():
-            user_id = User.query.filter_by(email='user@test.com').first().id
+        user_id = User.query.filter_by(email='user@test.com').first().id
         
         response = client.delete(f'/api/admin/users/{user_id}',
             headers={'Authorization': f'Bearer {admin_token}'}
@@ -258,20 +253,19 @@ class TestBookingManagement:
     @pytest.fixture
     def sample_booking(self, app, regular_user):
         """Create sample booking"""
-        with app.app_context():
-            booking = Booking(
-                user_id=regular_user.id,
-                booking_type='flight',
-                status=BookingStatus.PENDING,
-                origin='JFK',
-                destination='LAX',
-                base_price=500.00,
-                service_fee=50.00,
-                total_price=550.00
-            )
-            db.session.add(booking)
-            db.session.commit()
-            return booking
+        booking = Booking(
+            user_id=regular_user.id,
+            booking_type='flight',
+            status=BookingStatus.PENDING,
+            origin='JFK',
+            destination='LAX',
+            base_price=500.00,
+            service_fee=50.00,
+            total_price=550.00
+        )
+        db.session.add(booking)
+        db.session.commit()
+        return booking
     
     def test_list_bookings(self, client, admin_token, sample_booking):
         """Test listing bookings"""
@@ -297,8 +291,7 @@ class TestBookingManagement:
     
     def test_get_booking_details(self, client, admin_token, sample_booking, app):
         """Test getting booking details"""
-        with app.app_context():
-            booking_id = Booking.query.first().id
+        booking_id = Booking.query.first().id
         
         response = client.get(f'/api/admin/bookings/{booking_id}',
             headers={'Authorization': f'Bearer {admin_token}'}
@@ -312,8 +305,7 @@ class TestBookingManagement:
     
     def test_update_booking_status(self, client, admin_token, sample_booking, app):
         """Test updating booking status"""
-        with app.app_context():
-            booking_id = Booking.query.first().id
+        booking_id = Booking.query.first().id
         
         response = client.patch(f'/api/admin/bookings/{booking_id}',
             headers={'Authorization': f'Bearer {admin_token}'},
@@ -326,8 +318,7 @@ class TestBookingManagement:
     
     def test_cancel_booking(self, client, admin_token, sample_booking, app):
         """Test cancelling booking"""
-        with app.app_context():
-            booking_id = Booking.query.first().id
+        booking_id = Booking.query.first().id
         
         response = client.post(f'/api/admin/bookings/{booking_id}/cancel',
             headers={'Authorization': f'Bearer {admin_token}'},
@@ -380,20 +371,19 @@ class TestPackageManagement:
     def test_list_packages(self, client, admin_token, app):
         """Test listing packages"""
         # Create a package first
-        with app.app_context():
-            package = Package(
-                name='Test Package',
-                slug='test-package',
-                destination_city='Rome',
-                destination_country='Italy',
-                duration_days=5,
-                duration_nights=4,
-                starting_price=1000.00,
-                price_per_person=1000.00,
-                is_active=True
-            )
-            db.session.add(package)
-            db.session.commit()
+        package = Package(
+            name='Test Package',
+            slug='test-package',
+            destination_city='Rome',
+            destination_country='Italy',
+            duration_days=5,
+            duration_nights=4,
+            starting_price=1000.00,
+            price_per_person=1000.00,
+            is_active=True
+        )
+        db.session.add(package)
+        db.session.commit()
         
         response = client.get('/api/admin/packages',
             headers={'Authorization': f'Bearer {admin_token}'}
@@ -406,20 +396,19 @@ class TestPackageManagement:
     
     def test_update_package(self, client, admin_token, app):
         """Test updating package"""
-        with app.app_context():
-            package = Package(
-                name='Original Name',
-                slug='original-name',
-                destination_city='London',
-                destination_country='UK',
-                duration_days=4,
-                duration_nights=3,
-                starting_price=800.00,
-                price_per_person=800.00
-            )
-            db.session.add(package)
-            db.session.commit()
-            package_id = package.id
+        package = Package(
+            name='Original Name',
+            slug='original-name',
+            destination_city='London',
+            destination_country='UK',
+            duration_days=4,
+            duration_nights=3,
+            starting_price=800.00,
+            price_per_person=800.00
+        )
+        db.session.add(package)
+        db.session.commit()
+        package_id = package.id
         
         response = client.patch(f'/api/admin/packages/{package_id}',
             headers={'Authorization': f'Bearer {admin_token}'},
@@ -439,18 +428,17 @@ class TestContactMessages:
     @pytest.fixture
     def sample_contact(self, app):
         """Create sample contact message"""
-        with app.app_context():
-            contact = ContactMessage(
-                name='John Doe',
-                email='john@example.com',
-                subject='Question about booking',
-                message='I have a question...',
-                status='new',
-                priority='normal'
-            )
-            db.session.add(contact)
-            db.session.commit()
-            return contact
+        contact = ContactMessage(
+            name='John Doe',
+            email='john@example.com',
+            subject='Question about booking',
+            message='I have a question...',
+            status='new',
+            priority='normal'
+        )
+        db.session.add(contact)
+        db.session.commit()
+        return contact
     
     def test_list_contacts(self, client, admin_token, sample_contact):
         """Test listing contact messages"""
@@ -476,8 +464,7 @@ class TestContactMessages:
     
     def test_update_contact_status(self, client, admin_token, sample_contact, app):
         """Test updating contact message"""
-        with app.app_context():
-            contact_id = ContactMessage.query.first().id
+        contact_id = ContactMessage.query.first().id
         
         response = client.patch(f'/api/admin/contacts/{contact_id}',
             headers={'Authorization': f'Bearer {admin_token}'},
@@ -493,8 +480,7 @@ class TestContactMessages:
     
     def test_delete_contact(self, client, admin_token, sample_contact, app):
         """Test deleting contact message"""
-        with app.app_context():
-            contact_id = ContactMessage.query.first().id
+        contact_id = ContactMessage.query.first().id
         
         response = client.delete(f'/api/admin/contacts/{contact_id}',
             headers={'Authorization': f'Bearer {admin_token}'}
@@ -503,9 +489,8 @@ class TestContactMessages:
         assert response.status_code == 200
         
         # Verify deletion
-        with app.app_context():
-            contact = ContactMessage.query.get(contact_id)
-            assert contact is None
+        contact = ContactMessage.query.get(contact_id)
+        assert contact is None
 
 
 # ===== VALIDATION TESTS =====
@@ -515,8 +500,7 @@ class TestValidation:
     
     def test_invalid_user_update(self, client, admin_token, regular_user, app):
         """Test validation errors on user update"""
-        with app.app_context():
-            user_id = User.query.filter_by(email='user@test.com').first().id
+        user_id = User.query.filter_by(email='user@test.com').first().id
         
         response = client.patch(f'/api/admin/users/{user_id}',
             headers={'Authorization': f'Bearer {admin_token}'},
@@ -529,18 +513,17 @@ class TestValidation:
     
     def test_invalid_booking_cancellation(self, client, admin_token, app):
         """Test booking cancellation requires reason"""
-        with app.app_context():
-            booking = Booking(
-                user_id=User.query.first().id,
-                booking_type='flight',
-                status=BookingStatus.PENDING,
-                base_price=100.00,
-                service_fee=10.00,
-                total_price=110.00
-            )
-            db.session.add(booking)
-            db.session.commit()
-            booking_id = booking.id
+        booking = Booking(
+            user_id=User.query.first().id,
+            booking_type='flight',
+            status=BookingStatus.PENDING,
+            base_price=100.00,
+            service_fee=10.00,
+            total_price=110.00
+        )
+        db.session.add(booking)
+        db.session.commit()
+        booking_id = booking.id
         
         response = client.post(f'/api/admin/bookings/{booking_id}/cancel',
             headers={'Authorization': f'Bearer {admin_token}'},

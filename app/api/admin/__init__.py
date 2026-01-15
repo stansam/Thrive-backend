@@ -8,4 +8,4 @@ from flask import Blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 # Import routes after blueprint creation to avoid circular imports
-from app.api.admin import routes
+from . import dashboard, users, bookings, quotes, packages, payments, contacts

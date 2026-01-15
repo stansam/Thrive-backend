@@ -201,7 +201,7 @@ class AdminSchemas:
         
         # Optional fields
         if 'description' in data:
-            cleaned_data['description'] = str(data['description']).strip() if data['description'] else None
+            cleaned_data['full_description'] = str(data['description']).strip() if data['description'] else None
         
         if 'highlights' in data and isinstance(data['highlights'], list):
             cleaned_data['highlights'] = data['highlights']
@@ -254,7 +254,7 @@ class AdminSchemas:
                 cleaned_data['slug'] = slug
         
         if 'description' in data:
-            cleaned_data['description'] = str(data['description']).strip() if data['description'] else None
+            cleaned_data['full_description'] = str(data['description']).strip() if data['description'] else None
         
         if 'destinationCity' in data:
             cleaned_data['destination_city'] = str(data['destinationCity']).strip()
@@ -296,7 +296,7 @@ class AdminSchemas:
             cleaned_data['exclusions'] = data['exclusions']
         
         if 'itinerary' in data:
-            cleaned_data['itinerary'] = data['itineray']
+            cleaned_data['itinerary'] = data['itinerary']
         
         if 'hotelName' in data:
             cleaned_data['hotel_name'] = str(data['hotelName']).strip() if data['hotelName'] else None

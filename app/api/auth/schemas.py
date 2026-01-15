@@ -260,7 +260,16 @@ class AuthSchemas:
     @staticmethod
     def _validate_phone(phone: str) -> bool:
         """Validate phone number format"""
-        # Remove common formatting characters
+        # Remove common formatting characters, keeping + if present at start
         cleaned = re.sub(r'[\s\-\(\)]', '', phone)
-        # Check if it's 10-15 digits
-        return cleaned.isdigit() and 10 <= len(cleaned) <= 15
+        # Check integrity
+        if not cleaned: 
+            return False
+            
+        # Allow leading +
+        if cleaned.startswith('+'):
+            digits = cleaned[1:]
+        else:
+            digits = cleaned
+            
+        return digits.isdigit() and 10 <= len(digits) <= 15

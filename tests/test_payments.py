@@ -52,7 +52,7 @@ def test_create_payment_intent(client, seed_data, auth_header):
         'clientSecret': 'secret_123'
     }
     
-    with patch('app.api.payments.routes.PaymentService', return_value=mock_service_instance):
+    with patch('app.api.payments.process.PaymentService', return_value=mock_service_instance):
         response = client.post('/api/payments/create-intent', json={
             'bookingId': str(booking_id),
             'amount': 100.00,

@@ -25,7 +25,7 @@ def test_flight_search(client, auth_header):
         'data': [{'id': '1'}], 'meta': {}, 'dictionaries': {}
     }
     
-    with patch('app.api.flights.routes.create_amadeus_service', return_value=mock_service):
+    with patch('app.api.flights.search.create_amadeus_service', return_value=mock_service):
         response = client.post('/api/flights/search', json={
             'origin': 'JFK',
             'destination': 'LAX',
@@ -53,7 +53,7 @@ def test_confirm_price(client, auth_header):
         'data': {'flightOffers': [{'id': '1', 'price': {'total': '100'}}]}
     }
     
-    with patch('app.api.flights.routes.create_amadeus_service', return_value=mock_service):
+    with patch('app.api.flights.pricing.create_amadeus_service', return_value=mock_service):
         response = client.post('/api/flights/price', json={
             'flightOffers': [{'id': '1'}]
         }, headers=auth_header)
@@ -69,7 +69,7 @@ def test_create_booking(client, auth_header):
         'data': {'id': 'order_123', 'associatedRecords': [{'reference': 'REF123'}]}
     }
     
-    with patch('app.api.flights.routes.create_amadeus_service', return_value=mock_service):
+    with patch('app.api.flights.booking.create_amadeus_service', return_value=mock_service):
         response = client.post('/api/flights/book', json={
             'flightOffers': [{
                 'id': '1', 

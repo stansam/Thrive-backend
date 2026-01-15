@@ -98,6 +98,8 @@ class User(UserMixin, db.Model):
             'role': self.role.value,
             'subscription_tier': self.subscription_tier.value,
             'referral_code': self.referral_code,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
             'referral_credits': float(self.referral_credits)
         }
 
