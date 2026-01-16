@@ -21,6 +21,8 @@ class TripType(str, Enum):
     ONE_WAY = "one_way"
     ROUND_TRIP = "round_trip"
     MULTI_CITY = "multi_city"
+    PACKAGE = "package"
+    leisure = "leisure"
 
 class TravelClass(str, Enum):
     ECONOMY = "economy"

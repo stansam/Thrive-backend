@@ -172,3 +172,138 @@ def download_invoice(payment_id):
     except Exception as e:
         current_app.logger.error(f"Generate invoice error: {str(e)}")
         return APIResponse.error('Failed to generate invoice')
+
+@client_bp.route('/payments/create-intent', methods=['POST'])
+def create_payment_intent():
+    """
+    Create Stripe Payment Intent for a booking.
+    No JWT required here technically if we validate booking reference, 
+    but for security better to require it OR have a specific token.
+    For this 'Concierge Public Link' flow, we accept booking_reference.
+    """
+    try:
+        data = request.get_json() or {}
+        booking_reference = data.get('bookingReference')
+        
+        if not booking_reference:
+            return APIResponse.validation_error('Booking reference is required')
+            
+        # 1. Look up booking
+        booking = Booking.query.filter_by(booking_reference=booking_reference).first()
+        if not booking:
+            return APIResponse.not_found('Booking not found')
+            
+        # 2. Check status
+        if booking.status != BookingStatus.CONFIRMED:
+            return APIResponse.error(f'Booking is currently {booking.status.value}, not ready for payment')
+            
+        # 3. Create Intent
+        amount_usd = int(booking.total_price * 100) # Convert to cents
+        
+        stripe.api_key = current_app.config.get('STRIPE_SECRET_KEY')
+        intent = stripe.PaymentIntent.create(
+            amount=amount_usd,
+            currency='usd',
+            metadata={
+                'booking_reference': booking.booking_reference,
+                'booking_id': booking.id,
+                'integration_check': 'accept_a_payment'
+            }
+        )
+        
+        return APIResponse.success(
+            data={
+                'clientSecret': intent['client_secret'],
+                'amount': float(booking.total_price),
+                'currency': 'USD'
+            }
+        )
+    except Exception as e:
+        current_app.logger.error(f"Create payment intent error: {e}")
+        return APIResponse.error(str(e))
+
+
+@client_bp.route('/payments/confirm', methods=['POST'])
+def confirm_payment():
+    """
+    Confirm payment success and update booking status.
+    Called by frontend after Stripe confirms payment.
+    """
+    try:
+        data = request.get_json() or {}
+        payment_intent_id = data.get('paymentIntentId')
+        booking_reference = data.get('bookingReference')
+        
+        if not payment_intent_id or not booking_reference:
+            return APIResponse.validation_error('Payment Intent ID and Booking Reference required')
+            
+        booking = Booking.query.filter_by(booking_reference=booking_reference).first()
+        if not booking:
+            return APIResponse.not_found('Booking not found')
+            
+        stripe.api_key = current_app.config.get('STRIPE_SECRET_KEY')
+        intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+        
+        if intent.status == 'succeeded':
+            # 1. Update Booking
+            booking.status = BookingStatus.PAID
+            
+            # 2. Create Payment Record (if not exists)
+            existing_payment = Payment.query.filter_by(stripe_payment_intent_id=payment_intent_id).first()
+            if not existing_payment:
+                user_id = booking.user_id # We use the booking's user
+                
+                # Try to get card info
+                card_last4 = None
+                card_brand = None
+                if intent.charges.data:
+                    charge = intent.charges.data[0]
+                    payment_method_details = charge.payment_method_details
+                    if payment_method_details.type == 'card':
+                        card_last4 = payment_method_details.card.last4
+                        card_brand = payment_method_details.card.brand
+
+                payment = Payment(
+                    booking_id=booking.id,
+                    user_id=user_id,
+                    amount=booking.total_price,
+                    currency='USD',
+                    payment_method='stripe',
+                    status=PaymentStatus.PAID,
+                    stripe_payment_intent_id=payment_intent_id,
+                    stripe_charge_id=intent.latest_charge,
+                    card_last4=card_last4,
+                    card_brand=card_brand,
+                    paid_at=datetime.now(timezone.utc),
+                    payment_metadata={
+                        'description': 'Package Booking Payment',
+                        'stripe_status': intent.status
+                    }
+                )
+                db.session.add(payment)
+                db.session.commit()
+                
+                # 3. Send Notifications (Dual)
+                user = User.query.get(user_id)
+                NotificationService.send_payment_confirmation(user, payment, booking)
+                
+                # Admin Notification
+                try:
+                    admin_email = current_app.config.get('ADMIN_EMAIL') or 'admin@thrive-travel.com'
+                    admin_msg = f"""
+                    PAYMENT RECEIVED: {booking_reference}
+                    Amount: ${float(payment.amount)}
+                    User: {user.email}
+                    """
+                    EmailService.send_email(admin_email, "Payment Received", admin_msg, html=admin_msg)
+                except:
+                    pass
+                
+                return APIResponse.success(message='Payment confirmed successfully')
+        
+        return APIResponse.error(f'Payment not successful: {intent.status}')
+        
+    except Exception as e:
+        current_app.logger.error(f"Confirm payment error: {e}")
+        db.session.rollback()
+        return APIResponse.error('Error confirming payment')

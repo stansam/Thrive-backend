@@ -22,8 +22,8 @@ class NotificationService:
     def __init__(self):
         self.mail = None
         
-    def _create_notification(
-        self,
+    @staticmethod
+    def create_notification(
         user_id: str,
         notification_type: str,
         title: str,

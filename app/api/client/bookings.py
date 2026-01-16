@@ -1,7 +1,7 @@
 
 from flask import request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import stripe
 
@@ -13,7 +13,7 @@ from app.utils.api_response import APIResponse
 from app.utils.email import EmailService
 from app.utils.audit_logging import AuditLogger
 from app.services.notification import NotificationService
-
+from app.models.enums import TripType, BookingType
 from app.api.client import client_bp
 
 @client_bp.route('/bookings', methods=['GET'])
@@ -321,3 +321,192 @@ def cancel_booking(booking_id):
         db.session.rollback()
         current_app.logger.error(f"Cancel booking error: {str(e)}")
         return APIResponse.error('An error occurred while cancelling the booking')
+
+@client_bp.route('/bookings/request', methods=['POST'])
+@jwt_required()
+def request_booking():
+    """
+    Request a new booking (Concierge Flow)
+    Creates a booking with PENDING status.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user or not user.is_active:
+            return APIResponse.unauthorized('User not found or inactive')
+            
+        data = request.get_json() or {}
+        
+        # 1. Validate Input
+        # (Using a simple schema here, ideally move to DashboardSchemas)
+        required_fields = ['packageId', 'startDate', 'numAdults']
+        for field in required_fields:
+            if field not in data:
+                return APIResponse.validation_error({field: 'This field is required'})
+                
+        package_id = data.get('packageId')
+        start_date_str = data.get('startDate')
+        num_adults = int(data.get('numAdults', 1))
+        num_children = int(data.get('numChildren', 0))
+        num_infants = int(data.get('numInfants', 0))
+        special_requests = data.get('specialRequests', '')
+        
+        # 2. Get Package
+        package = Package.query.get_or_404(package_id)
+        
+        # 3. Calculate Preliminary Pricing
+        # This is an ESTIMATE. Admin confirms final price.
+        base_price = Decimal(str(package.starting_price)) * Decimal(num_adults)
+        # Add simple logic for children (e.g. 75% of adult price) - placeholder
+        if num_children > 0:
+            child_price = Decimal(str(package.starting_price)) * Decimal('0.75') * Decimal(num_children)
+            base_price += child_price
+            
+        # Service fee (configurable, 5% for now)
+        service_fee = base_price * Decimal('0.05') 
+        total_price = base_price + service_fee
+        
+        # 4. Create Booking
+        start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00')).date()
+        # Calculate return date based on duration
+        return_date = start_date + timedelta(days=package.duration_days)
+        
+        booking = Booking(
+            user_id=user.id,
+            booking_type=BookingType.PACKAGE.value,
+            trip_type= TripType.PACKAGE.value, # Default
+            status=BookingStatus.PENDING,
+            package_id=package.id,
+            origin='TBD', # Package usually includes flights or not?
+            destination=f"{package.destination_city}, {package.destination_country}",
+            departure_date=datetime.combine(start_date, datetime.min.time()),
+            return_date=datetime.combine(return_date, datetime.min.time()),
+            num_adults=num_adults,
+            num_children=num_children,
+            num_infants=num_infants,
+            base_price=base_price,
+            service_fee=service_fee,
+            total_price=total_price,
+            special_requests=special_requests,
+            notes="Initial request via Concierge Wizard"
+        )
+        
+        db.session.add(booking)
+        db.session.commit()
+        
+        # 5. Send Notifications (Dual: User + Admin)
+        
+        # User Notification
+        try:
+            # Create in-app notification
+            NotificationService.create_notification(
+                user_id=user.id,
+                notification_type='booking_request_received',
+                title='Booking Request Received',
+                message=f'We received your request for {package.name}. Reference: {booking.booking_reference}',
+                booking_id=booking.id
+            )
+            
+            # Send Email using existing service or custom template
+            # For now, using a simple message via the existing versatile method or a new one
+            # Ideally we extend NotificationService but for now we iterate:
+            
+            email_body = f"""
+            Dear {user.first_name},
+            
+            We have received your booking request for <strong>{package.name}</strong>.
+            
+            <strong>Booking Reference:</strong> {booking.booking_reference}
+            <strong>Travelers:</strong> {num_adults} Adults, {num_children} Children
+            <strong>Requested Dates:</strong> {start_date} to {return_date}
+            
+            Our concierge team is reviewing availability and will confirm your customized itinerary and final pricing shortly. 
+            You will receive a notification prompting you for payment once confirmed.
+            
+            Warm regards,
+            Thrive Concierge Team
+            """
+            
+            EmailService.send_email(
+                to=user.email,
+                subject=f"Booking Request Received - {booking.booking_reference}",
+                body=email_body, # fallback text
+                html=email_body
+            )
+            
+        except Exception as e:
+            current_app.logger.error(f"Failed to send user notification: {e}")
+
+        # Admin Notification (System Alert)
+        try:
+            admin_email = current_app.config.get('ADMIN_EMAIL') or 'admin@thrive-travel.com'
+            admin_body = f"""
+            <strong>New Concierge Booking Request</strong><br>
+            Reference: {booking.booking_reference}<br>
+            Package: {package.name}<br>
+            User: {user.first_name} {user.last_name} ({user.email})<br>
+            Status: PENDING<br>
+            <br>
+            Please login to Admin Dashboard to review and confirm.
+            """
+            
+            EmailService.send_email(
+                to=admin_email,
+                subject=f"ACTION REQUIRED: New Booking Request {booking.booking_reference}",
+                body=admin_body,
+                html=admin_body
+            )
+        except Exception as e:
+             current_app.logger.error(f"Failed to send admin notification: {e}")
+
+        
+        # Log Action
+        AuditLogger.log_action(
+            user_id=user.id,
+            action='booking_requested',
+            entity_type='booking',
+            entity_id=booking.id,
+            description=f'Requested booking {booking.booking_reference}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+
+        return APIResponse.success(
+            data={'booking': booking.to_dict()},
+            message='Booking request submitted successfully. We will contact you shortly.'
+        )
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Booking request error: {str(e)}")
+        # Check specific errors (like package not found)
+        return APIResponse.error(str(e))
+
+
+@client_bp.route('/bookings/reference/<reference>', methods=['GET'])
+def get_booking_by_reference(reference):
+    """
+    Get booking by public reference (No Auth required for initial payment view, 
+    but ideally we should verify email or token. For now, public read-only for payment context).
+    """
+    try:
+        booking = Booking.query.filter_by(booking_reference=reference).first()
+        if not booking:
+            return APIResponse.not_found('Booking not found')
+            
+        # Return safe subset of data
+        return APIResponse.success(
+            data={
+                'id': booking.id,
+                'bookingReference': booking.booking_reference,
+                'status': booking.status.value,
+                'totalPrice': float(booking.total_price),
+                'packageName': booking.package.name if booking.package else 'Custom Trip',
+                'departureDate': booking.departure_date.isoformat(),
+                'travelers': booking.get_total_passengers()
+            }
+        )
+    except Exception as e:
+        current_app.logger.error(f"Get booking ref error: {e}")
+        return APIResponse.error('Error fetching booking')
