@@ -25,17 +25,18 @@ class AuthSchemas:
         cleaned_data = {}
         
         # Full name validation and splitting
-        full_name = data.get('fullName', '').strip()
-        if not full_name:
-            errors['fullName'] = 'Full name is required'
-        elif len(full_name) < 2:
-            errors['fullName'] = 'Full name must be at least 2 characters'
-        else:
-            # Split full name into first and last name
-            name_parts = full_name.split(None, 1)  # Split on first whitespace
-            cleaned_data['first_name'] = name_parts[0]
-            cleaned_data['last_name'] = name_parts[1] if len(name_parts) > 1 else name_parts[0]
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        if not first_name:
+            errors['first_name'] = 'Full name is required'
+        if not last_name:
+            errors['last_name'] = 'Full name must be at least 2 characters'
         
+        
+        
+        cleaned_data['first_name'] = first_name
+        cleaned_data['last_name'] = last_name
+    
         # Email validation
         email = data.get('email', '').strip().lower()
         if not email:

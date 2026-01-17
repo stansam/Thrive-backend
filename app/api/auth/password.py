@@ -34,9 +34,10 @@ def request_password_reset():
         user = User.query.filter_by(email=cleaned_data['email']).first()
         
         if user and user.is_active:
-            # Generate reset token
-            reset_token = secrets.token_urlsafe(32)
-            # TODO: Store reset token with expiry in database or cache (1 hour expiry)
+            # Generate secure token
+            from itsdangerous import URLSafeTimedSerializer
+            s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+            reset_token = s.dumps(user.email, salt='password-reset-salt')
             
             # Send reset email
             reset_url = f"{current_app.config.get('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token={reset_token}"
@@ -103,32 +104,41 @@ def confirm_password_reset():
         if not is_valid:
             return APIResponse.validation_error(errors)
         
-        # TODO: Verify reset token from database/cache
-        # For now, this is a placeholder
-        # In production, retrieve user_id from stored token
+        token = cleaned_data['token']
+        new_password = cleaned_data['password']
         
-        # Placeholder: You would validate the token and get user_id
-        # user_id = validate_reset_token(cleaned_data['token'])
-        # if not user_id:
-        #     return APIResponse.unauthorized('Invalid or expired reset token')
+        # Verify token
+        from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+        s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
         
-        # For demonstration, returning error
-        return APIResponse.error(
-            'Password reset token validation not fully implemented. Please implement token storage and validation.',
-            status_code=501
+        try:
+            # Token valid for 1 hour (3600 seconds)
+            email = s.loads(token, salt='password-reset-salt', max_age=3600)
+        except SignatureExpired:
+            return APIResponse.unauthorized('The password reset link has expired.')
+        except BadSignature:
+            return APIResponse.unauthorized('Invalid password reset token.')
+            
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return APIResponse.unauthorized('User not found.')
+            
+        # Update password
+        user.set_password(new_password)
+        db.session.commit()
+        
+        # Log successful reset
+        AuditLogger.log_action(
+            user_id=user.id,
+            action='password_reset_success',
+            description='Password reset successfully using email token',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
         )
         
-        # When implemented:
-        # user = User.query.get(user_id)
-        # user.set_password(cleaned_data['password'])
-        # db.session.commit()
-        # 
-        # # Invalidate all existing tokens for this user
-        # # Log password reset
-        # AuditLogger.log_action(...)
-        # 
-        # return APIResponse.success(message='Password reset successful')
+        return APIResponse.success(message='Password reset successful. You can now login with your new password.')
         
     except Exception as e:
         current_app.logger.error(f"Password reset confirm error: {str(e)}")
-        return APIResponse.error('An error occurred. Please try again.')
+        # Don't expose internal errors unless necessary, but logging is key
+        return APIResponse.error('An error occurred while resetting your password.')
