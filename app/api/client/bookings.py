@@ -7,6 +7,7 @@ import stripe
 
 from app.extensions import db
 from app.models import User, Booking, Package, Payment
+from app.models.notification import Notification
 from app.models.enums import BookingStatus, PaymentStatus, SubscriptionTier, UserRole
 from app.api.client.schemas import DashboardSchemas
 from app.utils.api_response import APIResponse
@@ -166,6 +167,34 @@ def get_booking_details(booking_id):
                     'hotelName': package.hotel_name,
                     'hotelRating': package.hotel_rating
                 }
+
+        # --- Milestone 2 Enrichment ---
+        
+        # 1. Timeline
+        # Determine timestamps based on available data
+        paid_at_date = None
+        for p in booking.payments:
+            if p.status == PaymentStatus.PAID:
+                paid_at_date = p.paid_at
+                break
+        
+        booking_dict['timeline'] = {
+            'requestedAt': booking.created_at.isoformat(),
+            'reviewedAt': None, # To be implemented with Admin reviews
+            'invoicedAt': None, # To be implemented with Invoicing
+            'paidAt': paid_at_date.isoformat() if paid_at_date else None,
+            'ticketedAt': booking.confirmed_at.isoformat() if booking.confirmed_at else None
+        }
+
+        # 2. Updates (Notifications integration)
+        notifications = Notification.query.filter_by(booking_id=booking.id).order_by(Notification.created_at.desc()).all()
+        booking_dict['updates'] = [n.to_dict() for n in notifications]
+
+        # 3. Documents (Placeholders for now, or real links if endpoints exist)
+        booking_dict['documents'] = {
+            'invoiceUrl': f"/api/client/bookings/{booking.id}/invoice" if booking.status not in [BookingStatus.REQUESTED, BookingStatus.CANCELLED] else None,
+            'ticketUrl': f"/api/client/bookings/{booking.id}/ticket" if booking.status == BookingStatus.CONFIRMED else None
+        }
         
         return APIResponse.success(
             data={'booking': booking_dict},

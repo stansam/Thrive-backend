@@ -91,16 +91,105 @@ class Booking(db.Model):
     def get_total_passengers(self):
         return self.num_adults + self.num_children + self.num_infants
     
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'booking_reference': self.booking_reference,
-            'booking_type': self.booking_type,
-            'status': self.status.value,
-            'origin': self.origin,
-            'destination': self.destination,
-            'departure_date': self.departure_date.isoformat() if self.departure_date else None,
-            'return_date': self.return_date.isoformat() if self.return_date else None,
-            'total_price': float(self.total_price),
-            'created_at': self.created_at.isoformat()
+    def to_dict(self, include_relations: bool = True):
+        """
+        Serialize Booking model to dictionary for API responses.
+
+        Args:
+            include_relations (bool): Whether to include passengers, payments, agent info
+
+        Returns:
+            dict
+        """
+
+        data = {
+            # Identifiers
+            "id": self.id,
+            "booking_reference": self.booking_reference,
+
+            # Ownership
+            "user_id": self.user_id,
+            "assigned_agent_id": self.assigned_agent_id,
+
+            # Booking meta
+            "booking_type": self.booking_type,
+            "status": self.status.value if self.status else None,
+            "is_urgent": self.is_urgent,
+
+            # Trip details
+            "trip_type": self.trip_type.value if self.trip_type else None,
+            "origin": self.origin,
+            "destination": self.destination,
+            "departure_date": self.departure_date.isoformat() if self.departure_date else None,
+            "return_date": self.return_date.isoformat() if self.return_date else None,
+
+            # Flight-specific
+            "airline": self.airline,
+            "flight_number": self.flight_number,
+            "travel_class": self.travel_class.value if self.travel_class else None,
+            "num_adults": self.num_adults,
+            "num_children": self.num_children,
+            "num_infants": self.num_infants,
+            "total_passengers": self.get_total_passengers(),
+
+            # Amadeus / GDS raw data
+            "flight_offer": self.flight_offer,
+
+            # Package
+            "package_id": self.package_id,
+
+            # Pricing (Decimal → float for JSON)
+            
+            "base_price": float(self.base_price) if self.base_price is not None else 0.0,
+            "service_fee": float(self.service_fee) if self.service_fee is not None else 0.0,
+            "taxes": float(self.taxes) if self.taxes is not None else 0.0,
+            "discount": float(self.discount) if self.discount is not None else 0.0,
+            "total_price": float(self.total_price) if self.total_price is not None else 0.0,
+            
+
+            # Notes & extras
+            "special_requests": self.special_requests,
+            "notes": self.notes,
+
+            # Confirmations
+            "airline_confirmation": self.airline_confirmation,
+            "ticket_numbers": self.ticket_numbers or [],
+
+            # Lifecycle timestamps
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "confirmed_at": self.confirmed_at.isoformat() if self.confirmed_at else None,
+            "cancelled_at": self.cancelled_at.isoformat() if self.cancelled_at else None,
         }
+
+        if include_relations:
+            data["passengers"] = [
+                p.to_dict() for p in self.passengers.all()
+            ] if self.passengers else []
+
+            data["payments"] = [
+                p.to_dict() for p in self.payments.all()
+            ] if self.payments else []
+
+            data["agent"] = (
+                {
+                    "id": self.agent.id,
+                    "name": self.agent.full_name if hasattr(self.agent, "full_name") else None,
+                    "email": self.agent.email
+                }
+                if self.agent else None
+            )
+
+        return data
+# def to_dict(self): 
+#   return { 
+#       'id': self.id, 
+#       'booking_reference': self.booking_reference, 
+#       'booking_type': self.booking_type, 
+#       'status': self.status.value, 
+#       'origin': self.origin, 
+#       'destination': self.destination, 
+#       'departure_date': self.departure_date.isoformat() if self.departure_date else None, 
+#       'return_date': self.return_date.isoformat() if self.return_date else None, 
+#       'total_price': float(self.total_price), 
+#       'created_at': self.created_at.isoformat() }

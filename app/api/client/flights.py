@@ -41,7 +41,7 @@ def get_flights():
             and_(
                 Booking.user_id == current_user_id,
                 Booking.booking_type == BookingType.FLIGHT,
-                Booking.status == BookingStatus.PENDING
+                Booking.status == BookingStatus.PENDING or Booking.status == BookingStatus.REQUESTED
             )
         ).count()
         
@@ -82,7 +82,7 @@ def get_flights():
         
         flight_list = []
         for flight in flights:
-            f_dict = flight.to_dict()
+            f_dict = flight.to_dict(include_relations=True)
             # Enrich with airline name, logo, route if stored in metadata or distinct fields
             # Assuming basic details are in Booking model or related metadata
             # For now, using standard to_dict response
