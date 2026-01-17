@@ -20,7 +20,7 @@ API Documentation: https://developers.amadeus.com/self-service/category/flights
 
 import os
 import time
-import logging
+from flask import current_app
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -31,12 +31,10 @@ from urllib3.util.retry import Retry
 
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# )
 
 class AmadeusEnvironment(Enum):
     """Amadeus API environment endpoints"""
@@ -117,7 +115,7 @@ class AmadeusFlightService:
         self._token_expiry: Optional[datetime] = None
         self._session = self._create_session()
         
-        logger.info(f"Initialized Amadeus service for {config.environment.name} environment")
+        current_app.logger.info(f"Initialized Amadeus service for {config.environment.name} environment")
     
     def _create_session(self) -> requests.Session:
         """
@@ -162,7 +160,7 @@ class AmadeusFlightService:
         }
         
         try:
-            logger.info("Authenticating with Amadeus API...")
+            current_app.logger.info("Authenticating with Amadeus API...")
             response = self._session.post(
                 url,
                 headers=headers,
@@ -175,10 +173,10 @@ class AmadeusFlightService:
                 self._access_token = token_data["access_token"]
                 expires_in = token_data.get("expires_in", 1799)
                 self._token_expiry = datetime.now() + timedelta(seconds=expires_in)
-                logger.info(f"Authentication successful. Token expires in {expires_in} seconds")
+                current_app.logger.info(f"Authentication successful. Token expires in {expires_in} seconds")
             else:
                 error_msg = f"Authentication failed with status {response.status_code}"
-                logger.error(error_msg)
+                current_app.logger.error(error_msg)
                 raise AuthenticationError(
                     error_msg,
                     status_code=response.status_code,
@@ -186,7 +184,7 @@ class AmadeusFlightService:
                 )
                 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Authentication request failed: {str(e)}")
+            current_app.logger.error(f"Authentication request failed: {str(e)}")
             raise AuthenticationError(f"Authentication request failed: {str(e)}")
     
     def _ensure_authenticated(self) -> None:
@@ -231,22 +229,22 @@ class AmadeusFlightService:
             return response_data
         elif response.status_code == 400:
             error_msg = self._extract_error_message(response_data)
-            logger.error(f"Validation error: {error_msg}")
+            current_app.logger.error(f"Validation error: {error_msg}")
             raise ValidationError(error_msg, response.status_code, response_data)
         elif response.status_code == 401:
-            logger.error("Authentication failed")
+            current_app.logger.error("Authentication failed")
             self._access_token = None
             raise AuthenticationError("Authentication failed", response.status_code, response_data)
         elif response.status_code == 429:
-            logger.warning("Rate limit exceeded")
+            current_app.logger.warning("Rate limit exceeded")
             raise RateLimitError("Rate limit exceeded", response.status_code, response_data)
         elif response.status_code == 404:
             error_msg = "Resource not found"
-            logger.error(error_msg)
+            current_app.logger.error(error_msg)
             raise AmadeusAPIError(error_msg, response.status_code, response_data)
         else:
             error_msg = self._extract_error_message(response_data) or f"Request failed with status {response.status_code}"
-            logger.error(f"API error: {error_msg}")
+            current_app.logger.error(f"API error: {error_msg}")
             raise AmadeusAPIError(error_msg, response.status_code, response_data)
     
     def _extract_error_message(self, response_data: Dict) -> str:
@@ -320,10 +318,10 @@ class AmadeusFlightService:
                 return []
                 
         except AmadeusAPIError as e:
-            logger.warning(f"Location search failed: {e.message}")
+            current_app.logger.warning(f"Location search failed: {e.message}")
             return []
         except requests.exceptions.RequestException as e:
-            logger.error(f"Location search network error: {str(e)}")
+            current_app.logger.error(f"Location search network error: {str(e)}")
             return []
             
     def _normalize_locations(self, locations: List[Dict]) -> List[Dict[str, Any]]:
@@ -417,7 +415,7 @@ class AmadeusFlightService:
             params["max"] = max_results
         
         try:
-            logger.info(f"Searching flights: {origin} -> {destination} on {departure_date}")
+            current_app.logger.info(f"Searching flights: {origin} -> {destination} on {departure_date}")
             response = self._session.get(
                 url,
                 headers=self._get_headers(),
@@ -426,11 +424,11 @@ class AmadeusFlightService:
             )
             
             result = self._handle_response(response)
-            logger.info(f"Found {len(result.get('data', []))} flight offers")
+            current_app.logger.info(f"Found {len(result.get('data', []))} flight offers")
             return result
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Flight search request failed: {str(e)}")
+            current_app.logger.error(f"Flight search request failed: {str(e)}")
             raise AmadeusAPIError(f"Flight search request failed: {str(e)}")
     
     def search_flight_offers_post(
@@ -476,7 +474,7 @@ class AmadeusFlightService:
             payload["searchCriteria"] = search_criteria
         
         try:
-            logger.info(f"Searching flights (POST) with {len(origin_destinations)} segments")
+            current_app.logger.info(f"Searching flights (POST) with {len(origin_destinations)} segments")
             response = self._session.post(
                 url,
                 headers=self._get_headers(),
@@ -485,11 +483,11 @@ class AmadeusFlightService:
             )
             
             result = self._handle_response(response)
-            logger.info(f"Found {len(result.get('data', []))} flight offers")
+            current_app.logger.info(f"Found {len(result.get('data', []))} flight offers")
             return result
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Flight search (POST) request failed: {str(e)}")
+            current_app.logger.error(f"Flight search (POST) request failed: {str(e)}")
             raise AmadeusAPIError(f"Flight search request failed: {str(e)}")
     
     # ==================== FLIGHT OFFERS PRICE ====================
@@ -537,7 +535,7 @@ class AmadeusFlightService:
             params["include"] = ",".join(include)
         
         try:
-            logger.info(f"Confirming price for {len(flight_offers)} flight offer(s)")
+            current_app.logger.info(f"Confirming price for {len(flight_offers)} flight offer(s)")
             response = self._session.post(
                 url,
                 headers=self._get_headers(),
@@ -547,11 +545,11 @@ class AmadeusFlightService:
             )
             
             result = self._handle_response(response)
-            logger.info("Price confirmation successful")
+            current_app.logger.info("Price confirmation successful")
             return result
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Price confirmation request failed: {str(e)}")
+            current_app.logger.error(f"Price confirmation request failed: {str(e)}")
             raise AmadeusAPIError(f"Price confirmation request failed: {str(e)}")
     
     # ==================== FLIGHT CREATE ORDERS ====================
@@ -635,7 +633,7 @@ class AmadeusFlightService:
             payload["data"]["queuingOfficeId"] = queuing_office_id
         
         try:
-            logger.info(f"Creating flight order for {len(travelers)} traveler(s)")
+            current_app.logger.info(f"Creating flight order for {len(travelers)} traveler(s)")
             response = self._session.post(
                 url,
                 headers=self._get_headers(),
@@ -645,19 +643,19 @@ class AmadeusFlightService:
             
             result = self._handle_response(response)
             order_id = result.get("data", {}).get("id", "N/A")
-            logger.info(f"Flight order created successfully. Order ID: {order_id}")
+            current_app.logger.info(f"Flight order created successfully. Order ID: {order_id}")
             return result
             
         except AmadeusAPIError as e:
             if "SEGMENT SELL FAILURE" in str(e.message):
-                logger.error("Booking failed: Flight is no longer available")
+                current_app.logger.error("Booking failed: Flight is no longer available")
                 raise BookingError("Flight is no longer available (sold out)", e.status_code, e.response)
             elif "PRICE DISCREPANCY" in str(e.message):
-                logger.error("Booking failed: Price has changed")
+                current_app.logger.error("Booking failed: Price has changed")
                 raise BookingError("Price has changed, please re-confirm", e.status_code, e.response)
             raise
         except requests.exceptions.RequestException as e:
-            logger.error(f"Flight order creation request failed: {str(e)}")
+            current_app.logger.error(f"Flight order creation request failed: {str(e)}")
             raise BookingError(f"Flight order creation failed: {str(e)}")
     
     # ==================== FLIGHT ORDER MANAGEMENT ====================
@@ -678,7 +676,7 @@ class AmadeusFlightService:
         url = f"{self.base_url}/v1/booking/flight-orders/{order_id}"
         
         try:
-            logger.info(f"Retrieving flight order: {order_id}")
+            current_app.logger.info(f"Retrieving flight order: {order_id}")
             response = self._session.get(
                 url,
                 headers=self._get_headers(),
@@ -686,11 +684,11 @@ class AmadeusFlightService:
             )
             
             result = self._handle_response(response)
-            logger.info(f"Flight order retrieved successfully")
+            current_app.logger.info(f"Flight order retrieved successfully")
             return result
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Get flight order request failed: {str(e)}")
+            current_app.logger.error(f"Get flight order request failed: {str(e)}")
             raise AmadeusAPIError(f"Get flight order failed: {str(e)}")
     
     def cancel_flight_order(self, order_id: str) -> Dict[str, Any]:
@@ -716,7 +714,7 @@ class AmadeusFlightService:
         url = f"{self.base_url}/v1/booking/flight-orders/{order_id}"
         
         try:
-            logger.info(f"Cancelling flight order: {order_id}")
+            current_app.logger.info(f"Cancelling flight order: {order_id}")
             response = self._session.delete(
                 url,
                 headers=self._get_headers(),
@@ -725,23 +723,61 @@ class AmadeusFlightService:
             
             # DELETE returns 204 No Content on success
             if response.status_code == 204:
-                logger.info(f"Flight order {order_id} cancelled successfully")
+                current_app.logger.info(f"Flight order {order_id} cancelled successfully")
                 return {"status": "cancelled", "orderId": order_id}
             
             result = self._handle_response(response)
             return result
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Cancel flight order request failed: {str(e)}")
+            current_app.logger.error(f"Cancel flight order request failed: {str(e)}")
             raise AmadeusAPIError(f"Cancel flight order failed: {str(e)}")
     
+    # ==================== SEAT MAP DISPLAY ====================
+    
+    def get_seatmap(self, flight_offer: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Retrieve seat map for a flight offer
+        
+        Args:
+            flight_offer: The flight offer object from search results
+            
+        Returns:
+            List of seat map data
+            
+        Raises:
+            AmadeusAPIError: If request fails
+        """
+        url = f"{self.base_url}/v1/shopping/seatmaps"
+        
+        payload = {
+            "data": [flight_offer]
+        }
+        
+        try:
+            current_app.logger.info("Retrieving seat map for flight offer")
+            response = self._session.post(
+                url,
+                headers=self._get_headers(),
+                json=payload,
+                timeout=self.config.timeout
+            )
+            
+            result = self._handle_response(response)
+            current_app.logger.info("Seat map retrieved successfully")
+            return result.get('data', [])
+            
+        except requests.exceptions.RequestException as e:
+            current_app.logger.error(f"Seat map request failed: {str(e)}")
+            raise AmadeusAPIError(f"Seat map request failed: {str(e)}")
+
     # ==================== UTILITY METHODS ====================
     
     def close(self) -> None:
         """Close the session and cleanup resources"""
         if self._session:
             self._session.close()
-            logger.info("Amadeus service session closed")
+            current_app.logger.info("Amadeus service session closed")
 
 
 # ==================== CONVENIENCE FUNCTIONS ====================

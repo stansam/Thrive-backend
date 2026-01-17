@@ -96,3 +96,36 @@ def test_create_flight_order(amadeus_service):
         assert result['data']['id'] == "booking_123"
         mock_post.assert_called_once()
         
+    def test_get_seatmap_success(self, amadeus_service):
+        """Test successful seat map retrieval"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [{"type": "seatmap", "decks": []}]
+        }
+        
+        with patch.object(amadeus_service._session, 'post', return_value=mock_response) as mock_post:
+            flight_offer = {"type": "flight-offer", "id": "1"}
+            result = amadeus_service.get_seatmap(flight_offer)
+
+            assert len(result) == 1
+            assert result[0]["type"] == "seatmap"
+            mock_post.assert_called_once()
+            args, _ = mock_post.call_args
+            assert "shopping/seatmaps" in args[0]
+
+    def test_get_seatmap_failure(self, amadeus_service):
+        """Test seat map retrieval failure"""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.json.return_value = {
+            "errors": [{"title": "Invalid Request"}]
+        }
+        
+        with patch.object(amadeus_service._session, 'post', return_value=mock_response):
+            flight_offer = {"type": "flight-offer", "id": "1"}
+            
+            with pytest.raises(AmadeusAPIError) as exc:
+                amadeus_service.get_seatmap(flight_offer)
+            
+            assert "Invalid Request" in str(exc.value)

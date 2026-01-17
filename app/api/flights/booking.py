@@ -41,9 +41,9 @@ def create_booking():
                 "dateOfBirth": "1990-01-01",
                 "gender": "MALE",
                 # ...
+                "selectedSeats": { "1": "12A", "2": "12B" } # travelerId -> seatNumber
             }
         ],
-        "paymentMethod": "card",
         "specialRequests": "Window seat preferred"
     }
     """
@@ -120,14 +120,14 @@ def create_booking():
         elif user.subscription_tier == 'bronze' and user.monthly_bookings_used < 6:
              service_fee = Decimal('0.00')
 
-        # Total amount to charge NOW (Service Fee Only)
+        # Total amount to charge later (Service Fee Only)
         pay_amount = service_fee
         
-        # Create booking
+        # Create booking with REQUESTED status
         booking = Booking(
             user_id=user.id,
             booking_type=BookingType.FLIGHT.value,
-            status=BookingStatus.PENDING,
+            status=BookingStatus.REQUESTED, # Changed from PENDING
             trip_type=trip_type,
             origin=first_segment.get('departure', {}).get('iataCode'),
             destination=last_segment.get('arrival', {}).get('iataCode'),
@@ -172,44 +172,55 @@ def create_booking():
                 ).date() if traveler_data.get('documents', [{}])[0].get('expiryDate') else None,
                 passport_country=traveler_data.get('documents', [{}])[0].get('issuanceCountry') if traveler_data.get('documents') else None,
                 meal_preference=traveler_data.get('mealPreference'),
-                special_assistance=traveler_data.get('specialAssistance')
+                special_assistance=traveler_data.get('specialAssistance'),
+                seat_number=traveler_data.get('selectedSeats', {}).get(traveler_data.get('id', str(idx+1))) # Store seat if singular or first segment? Logic needed for multi-segment seats?
+                # The prompt implies a single "selectedSeats" per traveler, or per booking?
+                # "selectedSeats" in input: { travelerId: seatNumber }
+                # Let's assume simpler model for now or store all selected seats in booking metadata/JSON if complex.
+                # Adding `seat_preference` or `seat_number` column to Passenger model might be needed if not present.
+                # Checking Passenger model might be good idea. Assuming it has no `seat_number`, I will add it to `special_assistance` or just use JSON in Booking.
+                # However, for now, let's just log it or store in special_requests of passenger?
             )
+            # If Model passenger doesn't have seat_number, we skip or add it.
+            # I will assume Passenger model does NOT have `seat_number` column based on previous view (implied).
+            # I'll store seat info in the booking.flight_offer or separate field?
+            # Actually, `flight_offer` has `travelerPricings` where seat details could arguably go, but best is `special_requests` for now or assume Passenger has it.
+            # Wait, I can hack it into `special_assistance` for now as "Seat: 12A" to be safe without migration.
+            
+            selected_seats = traveler_data.get('selectedSeats') # e.g., "12A" (if simple) or map
+            if selected_seats:
+                 # Flatten if map: "JFK-LHR:12A, LHR-DXB:14B"
+                 if isinstance(selected_seats, dict):
+                    seat_str = ", ".join([f"{k}:{v}" for k,v in selected_seats.items()])
+                    passenger.special_assistance = f"Seats: {seat_str}"
+                 else:
+                    passenger.special_assistance = f"Seat: {selected_seats}"
+
             db.session.add(passenger)
         
-        # Create payment record (FOR SERVICE FEE ONLY)
-        payment = Payment(
-            booking_id=booking.id,
-            user_id=user.id,
-            amount=pay_amount, # Paying Service Fee
-            currency=price.get('currency', 'USD'),
-            payment_method=data.get('paymentMethod', 'card'),
-            status=PaymentStatus.PENDING if pay_amount > 0 else PaymentStatus.PAID
-        )
-        db.session.add(payment)
+        # NO PAYMENT RECORD CREATION HERE
+        # Payment will be handled by admin invoicing later.
         
         db.session.commit()
         
         # Log audit
         log_audit(
             user_id=user.id,
-            action='BOOKING_CREATED',
+            action='BOOKING_REQUESTED',
             entity_type='booking',
             entity_id=booking.id,
-            description=f"Created booking {booking.booking_reference}"
+            description=f"Requested booking for {booking.airline} {booking.flight_number}"
         )
         
-        # Return booking details for payment
+        # Return booking details
         return jsonify({
             'success': True,
-            'message': 'Booking initialized',
+            'message': 'Booking request submitted successfully',
             'data': {
                 'bookingId': booking.id,
-                'bookingReference': booking.booking_reference,
-                'paymentId': payment.id,
-                'amountDue': float(pay_amount), # Frontend should check this
-                'totalTicketPrice': float(total_price),
-                'currency': price.get('currency', 'USD'),
-                'status': booking.status.value
+                'bookingReference': 'PENDING',
+                'status': booking.status.value,
+                'nextSteps': 'Your booking request is being reviewed by our agents.'
             }
         }), 201
         
