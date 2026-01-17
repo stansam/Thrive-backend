@@ -215,7 +215,7 @@ class DashboardSchemas:
         
         # Status filter validation
         status = data.get('status', '').strip().lower()
-        valid_statuses = ['pending', 'confirmed', 'cancelled', 'completed', 'refunded', 'all']
+        valid_statuses = ['pending', 'confirmed', 'cancelled', 'completed', 'refunded', 'requested', 'all']
         
         if status:
             if status not in valid_statuses:
