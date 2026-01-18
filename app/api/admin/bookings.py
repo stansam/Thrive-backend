@@ -295,3 +295,152 @@ def get_booking_stats():
     except Exception as e:
         current_app.logger.error(f"Get booking stats error: {str(e)}")
         return APIResponse.error("Failed to fetch booking statistics")
+
+@admin_bp.route('/flights/<booking_reference>', methods=['GET'])
+@admin_required()
+def get_flight_booking_details(booking_reference):
+    """
+    Get detailed flight booking info for Admin Mission Control.
+    Single Source of Truth for:
+    - Booking Status
+    - Financials (Service Fee / Airline Fare)
+    - Documents
+    - Activity Log
+    """
+    try:
+        booking = Booking.query.filter_by(booking_reference=booking_reference).first()
+        if not booking:
+            return APIResponse.not_found("Booking not found")
+
+        # --- 1. Financial Status Logic ---
+        # Logic matches client-side: Check payments against split costs
+        service_fee_paid = False
+        airline_fare_paid = False
+        
+        # Calculate total paid from approved payments
+        total_paid = sum([p.amount for p in booking.payments if p.status.name == 'PAID'])
+        
+        # Heuristic: Service fee is paid if total_paid >= service_fee
+        if total_paid >= booking.service_fee and booking.service_fee > 0:
+            service_fee_paid = True
+        elif booking.service_fee == 0:
+             service_fee_paid = True # No fee to pay
+            
+        # Heuristic: Airline fare is paid if total_paid >= total_price
+        if total_paid >= booking.total_price:
+            airline_fare_paid = True
+
+        # --- 2. Invoices Construction ---
+        invoices_data = []
+        
+        # Service Fee Invoice
+        invoices_data.append({
+            "id": "sf_inv", # Placeholder or real ID
+            "type": "SERVICE_FEE",
+            "amount": float(booking.service_fee),
+            "currency": "USD",
+            "status": "PAID" if service_fee_paid else "UNPAID",
+            "payment_link": f"/pay/{booking.booking_reference}/service", # Mock link
+            "issued_at": booking.created_at.isoformat(), 
+            "document_url": None # Admin to upload
+        })
+
+        # Airline Fare Invoice
+        invoices_data.append({
+             "id": "air_inv",
+             "type": "AIRLINE_FARE",
+             "amount": float(booking.base_price + booking.taxes - booking.discount),
+             "currency": "USD",
+             "status": "PAID" if airline_fare_paid else "UNPAID",
+             "payment_link": f"/pay/{booking.booking_reference}/airline",
+             "issued_at": booking.confirmed_at.isoformat() if booking.confirmed_at else None,
+             "document_url": None
+        })
+
+        # --- 3. Documents ---
+        documents_data = []
+        # Mocking tickets if they exist
+        if booking.ticket_numbers:
+             documents_data.append({
+                "id": "tkt_1",
+                "type": "TICKET",
+                "version": 1,
+                "filename": f"Ticket_{booking.booking_reference}.pdf",
+                "uploaded_at": booking.updated_at.isoformat(),
+                "download_url": "#"
+             })
+
+        # --- 4. Activity Log ---
+        # Fetch generic audit logs for this booking
+        from app.models.audit_log import AuditLog
+        
+        audit_logs = AuditLog.query.filter(
+            (AuditLog.entity_id == booking.id) | 
+            (AuditLog.entity_type == 'booking') & (AuditLog.entity_id == booking.id)
+        ).order_by(AuditLog.created_at.desc()).all()
+        
+        activity_log = [{
+            "id": log.id,
+            "message": log.description,
+            "created_at": log.created_at.isoformat(),
+            "created_by": "ADMIN" if log.user_id else "SYSTEM" # Simplify for now, could fetch User
+        } for log in audit_logs]
+
+        # --- 5. Construct Final Response ---
+        response_data = {
+            "booking_reference": booking.booking_reference,
+            "status": booking.status.value,
+            "is_urgent": booking.is_urgent,
+            "assigned_agent": {
+                "id": booking.agent.id,
+                "name": booking.agent.first_name + " " + booking.agent.last_name
+            } if booking.agent else None,
+
+            "user": {
+                "id": booking.user_id, # User model might not be joined unless we eager load or fetch
+                # Fetching user explicitly if relation is not eager loaded
+                "full_name": "Unknown User", # Placeholder, relies on relationship
+                "email": "unknown@example.com"
+            },
+            
+            "flight": {
+                "airline": booking.airline or "N/A",
+                "flight_numbers": [booking.flight_number] if booking.flight_number else [],
+                "origin": booking.origin,
+                "destination": booking.destination,
+                "departure_date": booking.departure_date.isoformat() if booking.departure_date else None,
+                "return_date": booking.return_date.isoformat() if booking.return_date else None,
+                "cabin_class": booking.travel_class.value if booking.travel_class else "Economy"
+            },
+
+            "passengers": [p.to_dict() for p in booking.passengers],
+            
+            "pricing": {
+                "base_price": float(booking.base_price),
+                "service_fee": float(booking.service_fee),
+                "taxes": float(booking.taxes),
+                "discount": float(booking.discount),
+                "total_price": float(booking.total_price)
+            },
+
+            "invoices": invoices_data,
+            "documents": documents_data,
+            "activity_log": activity_log
+        }
+
+        # Populate User Details
+        from app.models import User
+        user = User.query.get(booking.user_id)
+        if user:
+            response_data['user'] = {
+                "id": user.id,
+                "full_name": f"{user.first_name} {user.last_name}",
+                "email": user.email,
+                "phone": user.phone
+            }
+
+        return APIResponse.success(response_data)
+
+    except Exception as e:
+        current_app.logger.error(f"Get admin flight details error: {str(e)}")
+        return APIResponse.error("Failed to fetch admin flight details")
