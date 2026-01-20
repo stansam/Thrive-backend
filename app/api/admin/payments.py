@@ -36,6 +36,10 @@ def get_payments():
         if end_date:
             query = query.filter(Payment.created_at <= end_date)
         
+        # User filter
+        if 'userId' in args and args['userId']:
+            query = query.filter_by(user_id=args['userId'])
+        
         # Sort by creation date
         query = query.order_by(desc(Payment.created_at))
         
