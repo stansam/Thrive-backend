@@ -89,7 +89,29 @@ class AdminSchemas:
         
         if 'airlineConfirmation' in data:
             cleaned_data['airline_confirmation'] = str(data['airlineConfirmation']).strip() if data['airlineConfirmation'] else None
-        
+
+        if 'flightNumber' in data:
+            cleaned_data['flight_number'] = str(data['flightNumber']).strip() if data['flightNumber'] else None
+
+        if 'airline' in data:
+            cleaned_data['airline'] = str(data['airline']).strip() if data['airline'] else None
+
+        if 'ticketNumbers' in data and isinstance(data['ticketNumbers'], list):
+             cleaned_data['ticket_numbers'] = data['ticketNumbers']
+
+        # Financials
+        for field, model_field in [
+            ('basePrice', 'base_price'), 
+            ('serviceFee', 'service_fee'), 
+            ('taxes', 'taxes'), 
+            ('discount', 'discount')
+        ]:
+            if field in data:
+                try:
+                    cleaned_data[model_field] = float(data[field])
+                except (ValueError, TypeError):
+                    errors[field] = 'Must be a valid number'
+
         return len(errors) == 0, errors, cleaned_data
     
     @staticmethod
