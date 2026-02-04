@@ -173,7 +173,7 @@ def create_booking():
                 passport_country=traveler_data.get('documents', [{}])[0].get('issuanceCountry') if traveler_data.get('documents') else None,
                 meal_preference=traveler_data.get('mealPreference'),
                 special_assistance=traveler_data.get('specialAssistance'),
-                seat_number=traveler_data.get('selectedSeats', {}).get(traveler_data.get('id', str(idx+1))) # Store seat if singular or first segment? Logic needed for multi-segment seats?
+                seat_number=traveler_data.get('selectedSeats') if isinstance(traveler_data.get('selectedSeats'), str) else traveler_data.get('selectedSeats', {}).get(traveler_data.get('id', str(idx+1)))
                 # The prompt implies a single "selectedSeats" per traveler, or per booking?
                 # "selectedSeats" in input: { travelerId: seatNumber }
                 # Let's assume simpler model for now or store all selected seats in booking metadata/JSON if complex.
